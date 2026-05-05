@@ -16,6 +16,7 @@ import {
   Avatar,
   Popover,
   MenuItem,
+  MenuList,
   Paper,
 } from "@mui/material";
 
@@ -250,7 +251,7 @@ export default function Navigation() {
                     </Box>
 
                     {/* Menu Items */}
-                    <Stack sx={{ p: 1 }}>
+                    <MenuList sx={{ p: 1 }}>
                       <MenuItem
                         component={Link}
                         href="/"
@@ -286,7 +287,7 @@ export default function Navigation() {
                       >
                         <Typography sx={{ fontWeight: 600 }}>🚪 Logout</Typography>
                       </MenuItem>
-                    </Stack>
+                    </MenuList>
                   </Paper>
                 </Popover>
               </>
