@@ -3,8 +3,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { useFormik } from "formik";
-import * as Yup from "yup";
 import { useSession } from "next-auth/react";
 import {
   Alert,
@@ -14,10 +12,11 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
-  Stack,
-  TextField,
   Typography,
+  Grid,
+  CircularProgress,
+  Stack,
+  CardActions,
 } from "@mui/material";
 import Navigation from "@/components/navigation";
 import { api, type ApiResponse } from "@/lib/api";
@@ -28,6 +27,18 @@ type BackendUser = {
   username: string;
   role: string;
   createdAt: string;
+};
+
+type Position = {
+  id: number;
+  companyId: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  company: {
+    id: number;
+    name: string;
+  };
 };
 
 type StartInterviewResponse = {
@@ -41,24 +52,12 @@ type StartInterviewResponse = {
   updatedAt: string;
 };
 
-const applicationSchema = Yup.object({
-  companyId: Yup.number()
-    .typeError("Company ID harus berupa angka")
-    .integer("Company ID harus bilangan bulat")
-    .positive("Company ID harus lebih dari 0")
-    .required("Company ID wajib diisi"),
-  positionId: Yup.number()
-    .typeError("Position ID harus berupa angka")
-    .integer("Position ID harus bilangan bulat")
-    .positive("Position ID harus lebih dari 0")
-    .required("Position ID wajib diisi"),
-});
-
 export default function InternshipApplicationPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [loadingPositionId, setLoadingPositionId] = useState<number | null>(null);
 
   const { data: profile } = useSWR(
     session?.accessToken ? ["me", session.accessToken] : null,
@@ -73,65 +72,66 @@ export default function InternshipApplicationPage() {
     },
   );
 
+  const { data: positions, error: positionsError, isLoading: loadingPositions } = useSWR(
+    session?.accessToken ? ["positions", session.accessToken] : null,
+    async ([, accessToken]) => {
+      const response = await api.get<ApiResponse<Position[]>>("/position", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return response.data.data || [];
+    }
+  );
+
   const applicantName = useMemo(
     () => profile?.name ?? session?.user?.name ?? "Calon Magang",
     [profile?.name, session?.user?.name],
   );
 
-  const formik = useFormik({
-    initialValues: {
-      companyId: "",
-      positionId: "",
-    },
-    validationSchema: applicationSchema,
-    validateOnBlur: true,
-    validateOnChange: false,
-    onSubmit: async (values, helpers) => {
-      setSubmitError(null);
-      setSubmitSuccess(null);
+  const handleApply = async (positionId: number, companyId: number) => {
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    
+    if (!session?.accessToken) {
+      setSubmitError("Session login tidak ditemukan. Silakan login ulang.");
+      return;
+    }
 
-      if (!session?.accessToken) {
-        setSubmitError("Session login tidak ditemukan. Silakan login ulang.");
-        helpers.setSubmitting(false);
-        return;
-      }
+    setLoadingPositionId(positionId);
 
-      try {
-        const response = await api.post<ApiResponse<StartInterviewResponse>>(
-          "/interviews",
-          {
-            companyId: Number(values.companyId),
-            positionId: Number(values.positionId),
+    try {
+      const response = await api.post<ApiResponse<StartInterviewResponse>>(
+        "/interviews",
+        {
+          companyId,
+          positionId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
           },
-          {
-            headers: {
-              Authorization: `Bearer ${session.accessToken}`,
-            },
-          },
-        );
+        },
+      );
 
-        const interview = response.data.data;
-        setSubmitSuccess(
-          interview
-            ? `Lamaran berhasil dibuat. Interview ID: ${interview.id}`
-            : "Lamaran berhasil dibuat.",
-        );
-        helpers.resetForm();
-
-        if (interview?.id) {
-          router.refresh();
-        }
-      } catch (error) {
-        if (error instanceof Error) {
-          setSubmitError(error.message);
-        } else {
-          setSubmitError("Gagal mengirim lamaran magang.");
-        }
-      } finally {
-        helpers.setSubmitting(false);
+      const interview = response.data.data;
+      setSubmitSuccess(
+        interview
+          ? `Lamaran berhasil dibuat. Interview ID: ${interview.id}`
+          : "Lamaran berhasil dibuat.",
+      );
+      
+      if (interview?.id) {
+        router.push(`/interview/${interview.id}`);
       }
-    },
-  });
+    } catch (error) {
+      if (error instanceof Error) {
+        setSubmitError(error.message);
+      } else {
+        setSubmitError("Gagal mengirim lamaran magang.");
+      }
+    } finally {
+      setLoadingPositionId(null);
+    }
+  };
 
   return (
     <Box sx={{ minHeight: "100vh", py: { xs: 3, md: 4 } }}>
@@ -139,157 +139,88 @@ export default function InternshipApplicationPage() {
         <Navigation />
         <Box sx={{ height: 24 }} />
 
-        <Box
+        <Card
+          elevation={0}
           sx={{
-            display: "grid",
-            gap: 3,
-            gridTemplateColumns: { xs: "1fr", md: "1.15fr 0.85fr" },
-            alignItems: "stretch",
+            mb: 4,
+            border: "1px solid rgba(15, 23, 42, 0.08)",
+            background:
+              "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(240,253,250,0.9))",
           }}
         >
-          <Card
-            elevation={0}
-            sx={{
-              border: "1px solid rgba(15, 23, 42, 0.08)",
-              background:
-                "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(240,253,250,0.9))",
-            }}
-          >
-            <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-              <Stack spacing={3} component="form" onSubmit={formik.handleSubmit} noValidate>
-                <Stack spacing={1}>
-                  <Chip label="Lamar Magang" sx={{ width: "fit-content" }} />
-                  <Typography variant="h3" sx={{ fontWeight: 800 }}>
-                    Ajukan magang untuk {applicantName}
-                  </Typography>
-                  <Typography color="text.secondary" sx={{ maxWidth: 720 }}>
-                    Backend saat ini memakai endpoint `POST /interviews` untuk memulai
-                    proses lamar/interview. Isi `companyId` dan `positionId` yang valid
-                    dari data seed/admin.
-                  </Typography>
-                </Stack>
+          <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+            <Stack spacing={1}>
+              <Chip label="Lamar Magang" color="primary" sx={{ width: "fit-content", fontWeight: 700 }} />
+              <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                Halo, {applicantName}
+              </Typography>
+              <Typography color="text.secondary">
+                Pilih posisi dan perusahaan di bawah ini untuk memulai proses wawancara.
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
 
-                <Divider />
+        {submitError ? <Alert severity="error" sx={{ mb: 3 }}>{submitError}</Alert> : null}
+        {submitSuccess ? <Alert severity="success" sx={{ mb: 3 }}>{submitSuccess}</Alert> : null}
 
-                {submitError ? <Alert severity="error">{submitError}</Alert> : null}
-                {submitSuccess ? <Alert severity="success">{submitSuccess}</Alert> : null}
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, mb: 3 }}>
+            Lowongan Tersedia
+          </Typography>
 
-                <Box
-                  sx={{
-                    display: "grid",
-                    gap: 2,
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                  }}
-                >
-                  <TextField
-                    id="companyId"
-                    name="companyId"
-                    label="Company ID"
-                    type="number"
-                    value={formik.values.companyId}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    error={formik.touched.companyId && Boolean(formik.errors.companyId)}
-                    helperText={formik.touched.companyId ? formik.errors.companyId : " "}
-                    fullWidth
-                  />
-
-                  <TextField
-                    id="positionId"
-                    name="positionId"
-                    label="Position ID"
-                    type="number"
-                    value={formik.values.positionId}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    error={formik.touched.positionId && Boolean(formik.errors.positionId)}
-                    helperText={formik.touched.positionId ? formik.errors.positionId : " "}
-                    fullWidth
-                  />
-                </Box>
-
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="large"
-                    disabled={formik.isSubmitting}
-                    sx={{ fontWeight: 700, px: 3 }}
+          {loadingPositions ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : positionsError ? (
+            <Alert severity="error">Gagal memuat lowongan posisi.</Alert>
+          ) : positions && positions.length > 0 ? (
+            <Grid container spacing={3}>
+              {positions.map((pos) => (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={pos.id}>
+                  <Card
+                    elevation={0}
+                    sx={{
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      border: "1px solid rgba(15, 23, 42, 0.08)",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      "&:hover": {
+                        transform: "translateY(-4px)",
+                        boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
+                      },
+                    }}
                   >
-                    {formik.isSubmitting ? "Mengirim..." : "Kirim Lamaran"}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    onClick={() => router.push("/")}
-                    sx={{ fontWeight: 700, px: 3 }}
-                  >
-                    Kembali ke Dashboard
-                  </Button>
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Stack spacing={3}>
-            <Card
-              elevation={0}
-              sx={{
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                background: "rgba(255,255,255,0.82)",
-              }}
-            >
-              <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-                <Stack spacing={1.5}>
-                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    Data Kandidat
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Data ini diambil dari session dan diverifikasi ulang ke backend.
-                  </Typography>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Username
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {profile?.username ?? session?.user?.username ?? "-"}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Role
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {profile?.role ?? session?.user?.role ?? "-"}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-
-            <Card
-              elevation={0}
-              sx={{
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                background:
-                  "linear-gradient(160deg, rgba(15,118,110,0.08), rgba(15,23,42,0.04))",
-              }}
-            >
-              <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-                <Stack spacing={1.5}>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    Catatan API
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Endpoint yang dipakai adalah `POST /interviews` dengan payload
-                    `companyId` dan `positionId`. Jika kamu ingin daftar perusahaan/
-                    posisi muncul sebagai dropdown, backend perlu endpoint list untuk
-                    `Company` dan `Position`.
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Stack>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="overline" color="primary" sx={{ fontWeight: 700, letterSpacing: 1.5 }}>
+                        {pos.company?.name || "Perusahaan Anonim"}
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5, lineHeight: 1.3 }}>
+                        {pos.name}
+                      </Typography>
+                    </CardContent>
+                    <CardActions sx={{ p: 2, pt: 0 }}>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        onClick={() => handleApply(pos.id, pos.companyId)}
+                        disabled={loadingPositionId === pos.id}
+                        sx={{ borderRadius: 2, fontWeight: 700 }}
+                      >
+                        {loadingPositionId === pos.id ? <CircularProgress size={24} color="inherit" /> : "Lamar & Mulai Interview"}
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Typography color="text.secondary" sx={{ textAlign: "center", py: 8 }}>
+              Belum ada posisi yang tersedia saat ini.
+            </Typography>
+          )}
         </Box>
       </Container>
     </Box>

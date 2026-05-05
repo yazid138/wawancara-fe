@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   Alert,
   Box,
@@ -13,6 +14,7 @@ import {
   Skeleton,
   Stack,
   Typography,
+  Divider,
 } from "@mui/material";
 import { api, type ApiResponse } from "@/lib/api";
 import Navigation from "@/components/navigation";
@@ -25,7 +27,18 @@ type BackendUser = {
   createdAt: string;
 };
 
+type Interview = {
+  id: number;
+  status: string;
+  currentIndex: number;
+  createdAt: string;
+  updatedAt: string;
+  company: { name: string };
+  position: { name: string };
+};
+
 export default function Home() {
+  const router = useRouter();
   const { data: session, status } = useSession();
 
   const { data, error, isLoading } = useSWR(
@@ -38,6 +51,19 @@ export default function Home() {
       });
 
       return response.data.data;
+    },
+  );
+
+  const { data: interviews, isLoading: loadingInterviews } = useSWR(
+    session?.accessToken ? ["interviews", session.accessToken] : null,
+    async ([, accessToken]) => {
+      const response = await api.get<ApiResponse<Interview[]>>("/interviews", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      return response.data.data || [];
     },
   );
 
@@ -123,11 +149,10 @@ export default function Home() {
             </Card>
           </Box>
 
-          <Box>
+          <Stack spacing={3}>
             <Card
               elevation={0}
               sx={{
-                minHeight: "100%",
                 border: "1px solid rgba(15, 23, 42, 0.08)",
                 background: "rgba(255,255,255,0.8)",
               }}
@@ -170,7 +195,63 @@ export default function Home() {
                 </Stack>
               </CardContent>
             </Card>
-          </Box>
+
+            <Card
+              elevation={0}
+              sx={{
+                border: "1px solid rgba(15, 23, 42, 0.08)",
+                background: "rgba(255,255,255,0.9)",
+              }}
+            >
+              <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+                <Stack spacing={2}>
+                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                    Riwayat Interview
+                  </Typography>
+                  
+                  {loadingInterviews ? (
+                    <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
+                  ) : interviews && interviews.length > 0 ? (
+                    <Stack spacing={2}>
+                      {interviews.map((inv) => (
+                        <Card key={inv.id} variant="outlined" sx={{ borderRadius: 3 }}>
+                          <CardContent sx={{ pb: 1 }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                                {inv.position?.name}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={inv.status === "FINISH" ? "Selesai" : "Berlangsung"}
+                                color={inv.status === "FINISH" ? "success" : "warning"}
+                                variant={inv.status === "FINISH" ? "outlined" : "filled"}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                              {inv.company?.name}
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              fullWidth
+                              onClick={() => router.push(`/interview/${inv.id}`)}
+                            >
+                              {inv.status === "FINISH" ? "Lihat Hasil" : "Lanjutkan"}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography color="text.secondary" variant="body2">
+                      Anda belum mengikuti interview apapun. Silakan buka menu Lamar Magang.
+                    </Typography>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
+
+          </Stack>
         </Box>
       </Container>
     </Box>
