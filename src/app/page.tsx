@@ -15,6 +15,8 @@ import {
   Stack,
   Typography,
   Divider,
+  Grid,
+  Paper,
 } from "@mui/material";
 import { api, type ApiResponse } from "@/lib/api";
 import Navigation from "@/components/navigation";
@@ -67,191 +69,511 @@ export default function Home() {
     },
   );
 
+  const statusColor = (status: string) => {
+    return status === "FINISH" ? "success" : "warning";
+  };
+
+  const statusLabel = (status: string) => {
+    return status === "FINISH" ? "Selesai" : "Berlangsung";
+  };
+
   return (
-    <Box sx={{ minHeight: "100vh", py: { xs: 4, md: 8 } }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        py: { xs: 3, md: 6 },
+        bgcolor: "background.default",
+      }}
+    >
       <Container maxWidth="lg">
         <Navigation />
         <Box sx={{ height: 24 }} />
-        <Box
-          sx={{
-            display: "grid",
-            gap: 3,
-            gridTemplateColumns: { xs: "1fr", md: "1.4fr 1fr" },
-            alignItems: "stretch",
-          }}
-        >
+
+        {/* Header Section */}
+        <Stack spacing={3} sx={{ mb: 5 }}>
           <Box>
-            <Card
-              elevation={0}
+            <Chip
+              label="Dashboard"
               sx={{
-                minHeight: "100%",
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                background:
-                  "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(239,246,255,0.92))",
+                mb: 2,
+                backgroundColor: "rgba(16, 185, 129, 0.1)",
+                color: "primary.main",
+                fontWeight: 600,
+              }}
+            />
+            <Typography
+              variant="h2"
+              sx={{
+                fontWeight: 800,
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
               }}
             >
-              <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-                <Stack spacing={3}>
-                  <Stack spacing={1}>
-                    <Chip label={status === "loading" ? "Memuat sesi" : "Dashboard"} sx={{ width: "fit-content" }} />
-                    <Typography variant="h3" sx={{ fontWeight: 800 }}>
-                      {session?.user?.name ?? "Pengguna"}
+              Selamat datang, {session?.user?.name ?? "Pengguna"}!
+            </Typography>
+            <Typography
+              color="text.secondary"
+              sx={{ mt: 1.5, fontSize: "1.05rem" }}
+            >
+              Kelola wawancara, pertanyaan, dan penilaian calon magang dengan
+              mudah.
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Profile Cards */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                height: "100%",
+                border: "1px solid #e2e8f0",
+                background:
+                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
+                transition: "all 0.3s",
+                "&:hover": {
+                  borderColor: "primary.main",
+                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
+                },
+              }}
+            >
+              <CardContent>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 600 }}
+                >
+                  NAMA PENGGUNA
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
+                  {isLoading ? (
+                    <Skeleton width="80%" />
+                  ) : (
+                    (data?.name ?? session?.user?.name)
+                  )}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                height: "100%",
+                border: "1px solid #e2e8f0",
+                background:
+                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
+                transition: "all 0.3s",
+                "&:hover": {
+                  borderColor: "primary.main",
+                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
+                },
+              }}
+            >
+              <CardContent>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 600 }}
+                >
+                  USERNAME
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
+                  {isLoading ? (
+                    <Skeleton width="70%" />
+                  ) : (
+                    (data?.username ?? session?.user?.username)
+                  )}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                height: "100%",
+                border: "1px solid #e2e8f0",
+                background:
+                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
+                transition: "all 0.3s",
+                "&:hover": {
+                  borderColor: "primary.main",
+                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
+                },
+              }}
+            >
+              <CardContent>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 600 }}
+                >
+                  ROLE
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
+                  {isLoading ? (
+                    <Skeleton width="60%" />
+                  ) : (
+                    (data?.role ?? session?.user?.role)
+                  )}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card
+              sx={{
+                height: "100%",
+                border: "1px solid #e2e8f0",
+                background:
+                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
+                transition: "all 0.3s",
+                "&:hover": {
+                  borderColor: "primary.main",
+                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
+                },
+              }}
+            >
+              <CardContent>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 600 }}
+                >
+                  TOTAL INTERVIEW
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
+                  {loadingInterviews ? (
+                    <Skeleton width="50%" />
+                  ) : (
+                    (interviews?.length ?? 0)
+                  )}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Main Content */}
+        <Grid container spacing={3}>
+          {/* Account Details */}
+          <Grid item xs={12} md={6}>
+            <Card
+              sx={{
+                border: "1px solid #e2e8f0",
+                height: "100%",
+                "&:hover": {
+                  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.08)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
+                  📋 Detail Akun
+                </Typography>
+                <Typography
+                  color="text.secondary"
+                  sx={{ mb: 3, fontSize: "0.95rem" }}
+                >
+                  Informasi profil yang tersimpan di sistem.
+                </Typography>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Stack spacing={2.5}>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{ fontWeight: 600, color: "text.secondary" }}
+                    >
+                      ID PENGGUNA
                     </Typography>
-                    <Typography color="text.secondary" sx={{ maxWidth: 640 }}>
-                      {session?.user?.role
-                        ? `Role aktif: ${session.user.role}. Data di bawah diambil dari endpoint /auth/me memakai token NextAuth.`
-                        : "Session belum tersedia."}
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {isLoading ? (
+                        <Skeleton width="40%" />
+                      ) : (
+                        (data?.id ?? session?.user?.id)
+                      )}
                     </Typography>
-                  </Stack>
+                  </Box>
 
-                  {error ? <Alert severity="error">Gagal mengambil data profil dari backend.</Alert> : null}
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{ fontWeight: 600, color: "text.secondary" }}
+                    >
+                      NAMA LENGKAP
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {isLoading ? (
+                        <Skeleton width="70%" />
+                      ) : (
+                        (data?.name ?? session?.user?.name)
+                      )}
+                    </Typography>
+                  </Box>
 
-                  <Stack spacing={2} direction={{ xs: "column", sm: "row" }}>
-                    <Button variant="contained" onClick={() => signOut({ callbackUrl: "/login" })}>
-                      Logout
-                    </Button>
-                  </Stack>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{ fontWeight: 600, color: "text.secondary" }}
+                    >
+                      TANGGAL TERDAFTAR
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {isLoading ? (
+                        <Skeleton width="60%" />
+                      ) : (
+                        new Date(
+                          data?.createdAt ?? session?.user?.createdAt,
+                        ).toLocaleDateString("id-ID", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })
+                      )}
+                    </Typography>
+                  </Box>
+                </Stack>
 
-                  <Box
+                {error && (
+                  <Alert severity="error" sx={{ mt: 3 }}>
+                    Gagal mengambil data profil
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Quick Actions */}
+          <Grid item xs={12} md={6}>
+            <Card
+              sx={{
+                border: "1px solid #e2e8f0",
+                height: "100%",
+                background:
+                  "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)",
+                "&:hover": {
+                  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.08)",
+                },
+              }}
+            >
+              <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
+                  ⚡ Tindakan Cepat
+                </Typography>
+                <Typography
+                  color="text.secondary"
+                  sx={{ mb: 3, fontSize: "0.95rem" }}
+                >
+                  Kelola akun dan akses fitur utama.
+                </Typography>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Stack spacing={2}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
                     sx={{
-                      display: "grid",
-                      gap: 2,
-                      gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                      py: 1.5,
+                      fontWeight: 600,
+                      borderColor: "#e2e8f0",
+                      "&:hover": {
+                        borderColor: "primary.main",
+                        backgroundColor: "rgba(16, 185, 129, 0.04)",
+                      },
                     }}
                   >
-                    <Box>
-                      <Card variant="outlined" sx={{ height: "100%" }}>
-                        <CardContent>
-                          <Typography variant="overline" color="text.secondary">
-                            Username
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {isLoading ? <Skeleton width="60%" /> : data?.username ?? session?.user?.username}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Box>
-                    <Box>
-                      <Card variant="outlined" sx={{ height: "100%" }}>
-                        <CardContent>
-                          <Typography variant="overline" color="text.secondary">
-                            Role
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {isLoading ? <Skeleton width="50%" /> : data?.role ?? session?.user?.role}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Box>
-                  </Box>
+                    ✏️ Edit Profil
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{
+                      py: 1.5,
+                      fontWeight: 600,
+                      borderColor: "#e2e8f0",
+                      "&:hover": {
+                        borderColor: "primary.main",
+                        backgroundColor: "rgba(16, 185, 129, 0.04)",
+                      },
+                    }}
+                  >
+                    🔐 Ubah Password
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    fullWidth
+                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    sx={{
+                      py: 1.5,
+                      fontWeight: 600,
+                    }}
+                  >
+                    🚪 Logout
+                  </Button>
                 </Stack>
               </CardContent>
             </Card>
-          </Box>
+          </Grid>
+        </Grid>
 
-          <Stack spacing={3}>
-            <Card
-              elevation={0}
-              sx={{
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                background: "rgba(255,255,255,0.8)",
-              }}
-            >
-              <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+        {/* Interview History */}
+        <Box sx={{ mt: 4 }}>
+          <Card sx={{ border: "1px solid #e2e8f0" }}>
+            <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>
+                📝 Riwayat Interview
+              </Typography>
+              <Typography
+                color="text.secondary"
+                sx={{ mb: 3, fontSize: "0.95rem" }}
+              >
+                Daftar semua interview yang telah atau sedang Anda ikuti.
+              </Typography>
+
+              <Divider sx={{ my: 2.5 }} />
+
+              {loadingInterviews ? (
                 <Stack spacing={2}>
-                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    Detail Akun
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Informasi ini diambil dari sesi NextAuth dan diverifikasi ulang ke backend.
-                  </Typography>
-
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      ID
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      {isLoading ? <Skeleton width="40%" /> : data?.id ?? session?.user?.id}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Nama
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      {isLoading ? <Skeleton width="70%" /> : data?.name ?? session?.user?.name}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Dibuat
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      {isLoading ? <Skeleton width="60%" /> : data?.createdAt ?? session?.user?.createdAt}
-                    </Typography>
-                  </Box>
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton
+                      key={i}
+                      variant="rectangular"
+                      height={100}
+                      sx={{ borderRadius: 2 }}
+                    />
+                  ))}
                 </Stack>
-              </CardContent>
-            </Card>
-
-            <Card
-              elevation={0}
-              sx={{
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                background: "rgba(255,255,255,0.9)",
-              }}
-            >
-              <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-                <Stack spacing={2}>
-                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                    Riwayat Interview
-                  </Typography>
-                  
-                  {loadingInterviews ? (
-                    <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
-                  ) : interviews && interviews.length > 0 ? (
-                    <Stack spacing={2}>
-                      {interviews.map((inv) => (
-                        <Card key={inv.id} variant="outlined" sx={{ borderRadius: 3 }}>
-                          <CardContent sx={{ pb: 1 }}>
-                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              ) : interviews && interviews.length > 0 ? (
+                <Grid container spacing={2}>
+                  {interviews.map((inv) => (
+                    <Grid item xs={12} sm={6} lg={4} key={inv.id}>
+                      <Paper
+                        sx={{
+                          p: 2.5,
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 2,
+                          height: "100%",
+                          transition: "all 0.3s",
+                          cursor: "pointer",
+                          "&:hover": {
+                            borderColor: "primary.main",
+                            boxShadow: "0 8px 24px rgba(16, 185, 129, 0.12)",
+                            transform: "translateY(-2px)",
+                          },
+                          backgroundColor:
+                            inv.status === "FINISH"
+                              ? "rgba(16, 185, 129, 0.03)"
+                              : "rgba(245, 158, 11, 0.03)",
+                        }}
+                        onClick={() => router.push(`/interview/${inv.id}`)}
+                      >
+                        <Stack spacing={2}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "start",
+                            }}
+                          >
+                            <Box>
+                              <Typography
+                                variant="subtitle1"
+                                sx={{ fontWeight: 800 }}
+                              >
                                 {inv.position?.name}
                               </Typography>
-                              <Chip
-                                size="small"
-                                label={inv.status === "FINISH" ? "Selesai" : "Berlangsung"}
-                                color={inv.status === "FINISH" ? "success" : "warning"}
-                                variant={inv.status === "FINISH" ? "outlined" : "filled"}
-                              />
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mt: 0.5 }}
+                              >
+                                {inv.company?.name}
+                              </Typography>
                             </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                              {inv.company?.name}
-                            </Typography>
-                            <Button
-                              variant="outlined"
+                            <Chip
                               size="small"
-                              fullWidth
-                              onClick={() => router.push(`/interview/${inv.id}`)}
-                            >
-                              {inv.status === "FINISH" ? "Lihat Hasil" : "Lanjutkan"}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Stack>
-                  ) : (
-                    <Typography color="text.secondary" variant="body2">
-                      Anda belum mengikuti interview apapun. Silakan buka menu Lamar Magang.
-                    </Typography>
-                  )}
-                </Stack>
-              </CardContent>
-            </Card>
+                              label={statusLabel(inv.status)}
+                              color={statusColor(inv.status) as any}
+                              variant="outlined"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </Box>
 
-          </Stack>
+                          <Divider />
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Progress: {inv.currentIndex} / soal
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 600,
+                                color:
+                                  inv.status === "FINISH"
+                                    ? "success.main"
+                                    : "warning.main",
+                              }}
+                            >
+                              {inv.status === "FINISH"
+                                ? "✓ Selesai"
+                                : "→ Berlangsung"}
+                            </Typography>
+                          </Box>
+
+                          <Button
+                            variant={
+                              inv.status === "FINISH" ? "outlined" : "contained"
+                            }
+                            color="primary"
+                            fullWidth
+                            size="small"
+                            sx={{ mt: 1 }}
+                          >
+                            {inv.status === "FINISH"
+                              ? "👁️ Lihat Hasil"
+                              : "▶️ Lanjutkan"}
+                          </Button>
+                        </Stack>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <Typography
+                    color="text.secondary"
+                    sx={{ mb: 2, fontSize: "1.05rem" }}
+                  >
+                    📭 Anda belum mengikuti interview apapun.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => router.push("/internship-applications")}
+                  >
+                    Mulai Lamar Magang
+                  </Button>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
         </Box>
       </Container>
     </Box>

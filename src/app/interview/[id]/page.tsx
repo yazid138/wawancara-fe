@@ -18,6 +18,8 @@ import {
   Paper,
   Alert,
   Chip,
+  Divider,
+  IconButton,
 } from "@mui/material";
 import Navigation from "@/components/navigation";
 import { interviewService } from "@/services/interviewService";
@@ -89,54 +91,121 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   }
 
   const isFinished = data?.history?.status === "FINISH";
+  const totalQuestions = data?.history?.answers?.length ?? 0;
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
       <Navigation />
-      <Container maxWidth="md" sx={{ flexGrow: 1, py: 4, display: "flex", flexDirection: "column" }}>
+      <Container maxWidth="md" sx={{ flexGrow: 1, py: 3, display: "flex", flexDirection: "column" }}>
         <Card
           elevation={0}
           sx={{
             flexGrow: 1,
             display: "flex",
             flexDirection: "column",
-            border: "1px solid rgba(15, 23, 42, 0.08)",
-            borderRadius: 4,
+            border: "1px solid #e2e8f0",
+            borderRadius: 3,
             overflow: "hidden",
-            boxShadow: "0 12px 40px rgba(15, 23, 42, 0.06)",
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.06)",
           }}
         >
           {/* Header */}
-          <Box sx={{ p: 3, borderBottom: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "rgba(255,255,255,0.9)" }}>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>
-              Sesi Wawancara
-            </Typography>
-            <Typography color="text.secondary" variant="body2">
-              Jawab pertanyaan dari AI dengan jelas dan komprehensif.
-            </Typography>
+          <Box sx={{
+            p: { xs: 2.5, sm: 3.5 },
+            borderBottom: "1px solid #e2e8f0",
+            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
+          }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="start" spacing={2}>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
+                  🎤 Sesi Wawancara
+                </Typography>
+                <Typography color="text.secondary" variant="body2">
+                  Jawab pertanyaan dengan jelas dan profesional.
+                </Typography>
+              </Box>
+              <Chip
+                label={isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions + (messages.length > 0 ? 1 : 0)}`}
+                color={isFinished ? "success" : "primary"}
+                variant="outlined"
+                sx={{ fontWeight: 600 }}
+              />
+            </Stack>
           </Box>
 
+          {/* Progress Bar */}
+          {!isFinished && (
+            <Box sx={{
+              height: 4,
+              background: "#e2e8f0",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <Box sx={{
+                height: "100%",
+                background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                width: `${Math.min((totalQuestions / 10) * 100, 95)}%`,
+                transition: "width 0.3s ease",
+              }} />
+            </Box>
+          )}
+
           {/* Chat Area */}
-          <Box sx={{ flexGrow: 1, p: 3, overflowY: "auto", bgcolor: "rgba(248, 250, 252, 0.5)" }}>
+          <Box sx={{
+            flexGrow: 1,
+            p: { xs: 2, sm: 3.5 },
+            overflowY: "auto",
+            bgcolor: "#fafbfc",
+            display: "flex",
+            flexDirection: "column",
+          }}>
             {isLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                <CircularProgress />
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 6 }}>
+                <CircularProgress size={48} sx={{ mb: 2 }} />
+                <Typography color="text.secondary">Memuat data wawancara...</Typography>
               </Box>
             ) : error ? (
-              <Alert severity="error">Gagal memuat data wawancara.</Alert>
+              <Alert severity="error" sx={{ borderRadius: 2 }}>
+                Gagal memuat data wawancara. Silakan coba lagi.
+              </Alert>
             ) : messages.length === 0 && !isFinished ? (
-              <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
-                Belum ada pesan.
-              </Typography>
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <Typography color="text.secondary" align="center">
+                  Belum ada pertanyaan.
+                </Typography>
+              </Box>
             ) : (
-              <Stack spacing={3}>
-                {messages.map((msg) => {
+              <Stack spacing={2.5}>
+                {messages.map((msg, idx) => {
                   const isUser = msg.sender === "USER";
                   return (
-                    <Box key={msg.id} sx={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", gap: 2 }}>
+                    <Box key={msg.id} sx={{
+                      display: "flex",
+                      justifyContent: isUser ? "flex-end" : "flex-start",
+                      gap: 1.5,
+                      animation: "slideIn 0.3s ease",
+                      "@keyframes slideIn": {
+                        from: {
+                          opacity: 0,
+                          transform: isUser ? "translateX(20px)" : "translateX(-20px)",
+                        },
+                        to: {
+                          opacity: 1,
+                          transform: "translateX(0)",
+                        },
+                      },
+                    }}>
                       {!isUser && (
-                        <Avatar sx={{ bgcolor: "primary.main", width: 36, height: 36, fontWeight: 700, fontSize: "0.9rem" }}>
-                          AI
+                        <Avatar sx={{
+                          bgcolor: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          width: 40,
+                          height: 40,
+                          fontWeight: 700,
+                          fontSize: "1rem",
+                          boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                          flexShrink: 0,
+                        }}>
+                          🤖
                         </Avatar>
                       )}
                       <Paper
@@ -144,29 +213,60 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                         sx={{
                           p: 2,
                           px: 3,
-                          maxWidth: "75%",
+                          maxWidth: "85%",
                           borderRadius: 3,
-                          borderTopRightRadius: isUser ? 0 : 3,
-                          borderTopLeftRadius: !isUser ? 0 : 3,
-                          bgcolor: isUser ? "primary.main" : "white",
-                          color: isUser ? "primary.contrastText" : "text.primary",
-                          boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
-                          border: isUser ? "none" : "1px solid rgba(15, 23, 42, 0.06)",
+                          borderTopRightRadius: isUser ? 4 : 3,
+                          borderTopLeftRadius: !isUser ? 4 : 3,
+                          bgcolor: isUser ? "#10b981" : "#ffffff",
+                          color: isUser ? "white" : "text.primary",
+                          boxShadow: isUser
+                            ? "0 4px 12px rgba(16, 185, 129, 0.2)"
+                            : "0 2px 8px rgba(0, 0, 0, 0.06)",
+                          border: isUser ? "none" : "1px solid #e2e8f0",
+                          wordWrap: "break-word",
                         }}
                       >
-                        <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{msg.text}</Typography>
+                        <Typography sx={{
+                          whiteSpace: "pre-wrap",
+                          lineHeight: 1.6,
+                          fontSize: { xs: "0.95rem", sm: "1rem" },
+                        }}>
+                          {msg.text}
+                        </Typography>
                       </Paper>
                       {isUser && (
-                        <Avatar sx={{ bgcolor: "secondary.main", width: 36, height: 36, fontWeight: 700, fontSize: "0.9rem" }}>
-                          U
+                        <Avatar sx={{
+                          bgcolor: "#059669",
+                          width: 40,
+                          height: 40,
+                          fontWeight: 700,
+                          fontSize: "1rem",
+                          boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)",
+                          flexShrink: 0,
+                        }}>
+                          👤
                         </Avatar>
                       )}
                     </Box>
                   );
                 })}
                 {isFinished && (
-                  <Box sx={{ display: "flex", justifyContent: "center", pt: 2 }}>
-                    <Chip label="Sesi wawancara telah selesai" color="success" variant="outlined" />
+                  <Box sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    pt: 3,
+                    pb: 1,
+                  }}>
+                    <Chip
+                      label="✓ Sesi wawancara telah selesai"
+                      color="success"
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.95rem",
+                        padding: "20px 24px",
+                      }}
+                    />
                   </Box>
                 )}
                 <div ref={messagesEndRef} />
@@ -174,43 +274,78 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
             )}
           </Box>
 
+          <Divider />
+
           {/* Input Area */}
           {!isFinished && (
             <Box
               component="form"
               onSubmit={formik.handleSubmit}
-              sx={{ p: 2, borderTop: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "white" }}
+              sx={{
+                p: { xs: 2, sm: 3 },
+                bgcolor: "#ffffff",
+                borderTop: "1px solid #e2e8f0",
+              }}
             >
-              <Box sx={{ display: "flex", flexDirection: "row", gap: 2, alignItems: "flex-end" }}>
+              <Stack spacing={2}>
                 <TextField
                   fullWidth
                   multiline
-                  maxRows={4}
-                  minRows={1}
+                  maxRows={5}
+                  minRows={2}
                   id="answer"
                   name="answer"
-                  placeholder="Ketik jawaban Anda di sini..."
+                  placeholder="Ketik jawaban Anda di sini... (Tekan Ctrl+Enter atau klik tombol Kirim)"
                   value={formik.values.answer}
                   onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
                   error={formik.touched.answer && Boolean(formik.errors.answer)}
                   helperText={formik.touched.answer && formik.errors.answer}
                   disabled={formik.isSubmitting || isLoading}
                   sx={{
                     "& .MuiOutlinedInput-root": {
-                      borderRadius: 3,
-                      bgcolor: "rgba(248, 250, 252, 0.8)",
+                      borderRadius: 2,
+                      border: "1px solid #e2e8f0",
+                      backgroundColor: "#fafbfc",
+                      transition: "all 0.2s",
+                      "&:hover": {
+                        borderColor: "#10b981",
+                      },
+                      "&.Mui-focused": {
+                        borderColor: "#10b981",
+                        backgroundColor: "#ffffff",
+                      },
                     },
                   }}
                 />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  disabled={formik.isSubmitting || isLoading || !formik.values.answer.trim()}
-                  sx={{ borderRadius: 3, minWidth: 100, height: 56, mb: formik.errors.answer ? 3 : 0 }}
-                >
-                  {formik.isSubmitting ? <CircularProgress size={24} color="inherit" /> : "Kirim"}
-                </Button>
-              </Box>
+                <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={formik.isSubmitting || isLoading || !formik.values.answer.trim()}
+                    sx={{
+                      px: 4,
+                      py: 1.2,
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                    }}
+                  >
+                    {formik.isSubmitting ? (
+                      <>
+                        <CircularProgress size={20} color="inherit" />
+                        Mengirim...
+                      </>
+                    ) : (
+                      "▶️ Kirim Jawaban"
+                    )}
+                  </Button>
+                </Stack>
+              </Stack>
             </Box>
           )}
         </Card>
