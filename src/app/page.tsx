@@ -1,65 +1,178 @@
-import Image from "next/image";
+"use client";
+
+import useSWR from "swr";
+import { signOut, useSession } from "next-auth/react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Skeleton,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { api, type ApiResponse } from "@/lib/api";
+import Navigation from "@/components/navigation";
+
+type BackendUser = {
+  id: number;
+  name: string;
+  username: string;
+  role: string;
+  createdAt: string;
+};
 
 export default function Home() {
+  const { data: session, status } = useSession();
+
+  const { data, error, isLoading } = useSWR(
+    session?.accessToken ? ["me", session.accessToken] : null,
+    async ([, accessToken]) => {
+      const response = await api.get<ApiResponse<BackendUser>>("/auth/me", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      return response.data.data;
+    },
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <Box sx={{ minHeight: "100vh", py: { xs: 4, md: 8 } }}>
+      <Container maxWidth="lg">
+        <Navigation />
+        <Box sx={{ height: 24 }} />
+        <Box
+          sx={{
+            display: "grid",
+            gap: 3,
+            gridTemplateColumns: { xs: "1fr", md: "1.4fr 1fr" },
+            alignItems: "stretch",
+          }}
+        >
+          <Box>
+            <Card
+              elevation={0}
+              sx={{
+                minHeight: "100%",
+                border: "1px solid rgba(15, 23, 42, 0.08)",
+                background:
+                  "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(239,246,255,0.92))",
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+                <Stack spacing={3}>
+                  <Stack spacing={1}>
+                    <Chip label={status === "loading" ? "Memuat sesi" : "Dashboard"} sx={{ width: "fit-content" }} />
+                    <Typography variant="h3" sx={{ fontWeight: 800 }}>
+                      {session?.user?.name ?? "Pengguna"}
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ maxWidth: 640 }}>
+                      {session?.user?.role
+                        ? `Role aktif: ${session.user.role}. Data di bawah diambil dari endpoint /auth/me memakai token NextAuth.`
+                        : "Session belum tersedia."}
+                    </Typography>
+                  </Stack>
+
+                  {error ? <Alert severity="error">Gagal mengambil data profil dari backend.</Alert> : null}
+
+                  <Stack spacing={2} direction={{ xs: "column", sm: "row" }}>
+                    <Button variant="contained" onClick={() => signOut({ callbackUrl: "/login" })}>
+                      Logout
+                    </Button>
+                  </Stack>
+
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 2,
+                      gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                    }}
+                  >
+                    <Box>
+                      <Card variant="outlined" sx={{ height: "100%" }}>
+                        <CardContent>
+                          <Typography variant="overline" color="text.secondary">
+                            Username
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            {isLoading ? <Skeleton width="60%" /> : data?.username ?? session?.user?.username}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Box>
+                    <Box>
+                      <Card variant="outlined" sx={{ height: "100%" }}>
+                        <CardContent>
+                          <Typography variant="overline" color="text.secondary">
+                            Role
+                          </Typography>
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            {isLoading ? <Skeleton width="50%" /> : data?.role ?? session?.user?.role}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Box>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+
+          <Box>
+            <Card
+              elevation={0}
+              sx={{
+                minHeight: "100%",
+                border: "1px solid rgba(15, 23, 42, 0.08)",
+                background: "rgba(255,255,255,0.8)",
+              }}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+                <Stack spacing={2}>
+                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                    Detail Akun
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Informasi ini diambil dari sesi NextAuth dan diverifikasi ulang ke backend.
+                  </Typography>
+
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      ID
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {isLoading ? <Skeleton width="40%" /> : data?.id ?? session?.user?.id}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Nama
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {isLoading ? <Skeleton width="70%" /> : data?.name ?? session?.user?.name}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Dibuat
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {isLoading ? <Skeleton width="60%" /> : data?.createdAt ?? session?.user?.createdAt}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      </Container>
+    </Box>
   );
 }
