@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { useFormik } from "formik";
@@ -20,7 +20,13 @@ import {
   Chip,
   Divider,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import Navigation from "@/components/navigation";
 import { interviewService } from "@/services/interviewService";
 
@@ -29,6 +35,10 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const interviewId = parseInt(id, 10);
   const { data: session } = useSession();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showExitWarning, setShowExitWarning] = useState(false);
 
   const fetcher = async ([, token]: [string, string]) => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
@@ -50,9 +60,9 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       answer: Yup.string().required("Jawaban tidak boleh kosong"),
     }),
     onSubmit: async (values, { resetForm }) => {
-      if (!session?.accessToken) return;
+      if (!session?.accessToken || !data?.currentQ) return;
       try {
-        await interviewService.submitAnswer(interviewId, values.answer, session.accessToken);
+        await interviewService.submitAnswer(interviewId, values.answer, data.currentQ.id, session.accessToken);
         resetForm();
         mutate();
       } catch (error) {
@@ -64,6 +74,124 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data]);
+
+  // Handle fullscreen lock
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent ESC key if interview is not finished and fullscreen is active
+      if (isFullscreen && !data?.history?.status?.includes("FINISH") && e.key === "Escape") {
+        e.preventDefault();
+        setShowExitWarning(true);
+      }
+      // Prevent Alt+Tab, Alt+F4 on some browsers
+      if (!data?.history?.status?.includes("FINISH") && isFullscreen) {
+        if ((e.altKey && e.key === "Tab") || (e.altKey && e.key === "F4")) {
+          e.preventDefault();
+          setShowExitWarning(true);
+        }
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("msfullscreenchange", handleFullscreenChange);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("msfullscreenchange", handleFullscreenChange);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFullscreen, data?.history?.status]);
+
+  // Handle page close attempt during interview
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isFullscreen && data?.history?.status !== "FINISH") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isFullscreen, data?.history?.status]);
+
+  // Auto-enter fullscreen on page load
+  useEffect(() => {
+    const autoEnterFullscreen = async () => {
+      if (!containerRef.current || isFullscreen) return;
+
+      try {
+        const elem = containerRef.current as any;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          await elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        }
+      } catch (error) {
+        console.error("Auto fullscreen error:", error);
+      }
+    };
+
+    // Delay to ensure DOM is ready
+    const timer = setTimeout(autoEnterFullscreen, 500);
+    return () => clearTimeout(timer);
+  }, [isFullscreen]);
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+
+    try {
+      if (!isFullscreen) {
+        const elem = containerRef.current as any;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          await elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        }
+      } else {
+        if (data?.history?.status === "FINISH") {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if ((document as any).webkitExitFullscreen) {
+            await (document as any).webkitExitFullscreen();
+          } else if ((document as any).mozCancelFullScreen) {
+            await (document as any).mozCancelFullScreen();
+          } else if ((document as any).msExitFullscreen) {
+            await (document as any).msExitFullscreen();
+          }
+        } else {
+          setShowExitWarning(true);
+        }
+      }
+    } catch (error) {
+      console.error("Fullscreen error:", error);
+    }
+  };
 
   const messages: { sender: "AI" | "USER"; text: string; id: string | number }[] = [];
 
@@ -94,13 +222,24 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const totalQuestions = data?.history?.answers?.length ?? 0;
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
+    <Box
+      ref={containerRef}
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.default",
+        ...(isFullscreen ? { height: "100vh" } : {}),
+      }}
+    >
       <Navigation />
       <Container maxWidth="md" sx={{ flexGrow: 1, py: 3, display: "flex", flexDirection: "column" }}>
         <Card
           elevation={0}
           sx={{
             flexGrow: 1,
+            height: "100%",
+            minHeight: 0,
             display: "flex",
             flexDirection: "column",
             border: "1px solid #e2e8f0",
@@ -115,7 +254,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
             borderBottom: "1px solid #e2e8f0",
             background: "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
           }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="start" spacing={2}>
+            <Stack direction="row" sx={{justifyContent: 'space-between', alignItems: 'start'}} spacing={2}>
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
                   🎤 Sesi Wawancara
@@ -124,12 +263,27 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   Jawab pertanyaan dengan jelas dan profesional.
                 </Typography>
               </Box>
-              <Chip
-                label={isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions + (messages.length > 0 ? 1 : 0)}`}
-                color={isFinished ? "success" : "primary"}
-                variant="outlined"
-                sx={{ fontWeight: 600 }}
-              />
+              <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                <IconButton
+                  onClick={toggleFullscreen}
+                  size="small"
+                  title={isFullscreen ? "Keluar Fullscreen" : "Masuk Fullscreen"}
+                  sx={{
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: "rgba(16, 185, 129, 0.1)",
+                    },
+                  }}
+                >
+                  {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                </IconButton>
+                <Chip
+                  label={isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions + (messages.length > 0 ? 1 : 0)}`}
+                  color={isFinished ? "success" : "primary"}
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+              </Stack>
             </Stack>
           </Box>
 
@@ -151,14 +305,19 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Chat Area */}
-          <Box sx={{
-            flexGrow: 1,
-            p: { xs: 2, sm: 3.5 },
-            overflowY: "auto",
-            bgcolor: "#fafbfc",
-            display: "flex",
-            flexDirection: "column",
-          }}>
+          <Box
+            sx={{
+              flexGrow: 1,
+              minHeight: 0,
+              p: { xs: 2, sm: 3.5 },
+              overflowY: "auto",
+              WebkitOverflowScrolling: "touch",
+              touchAction: "pan-y",
+              bgcolor: "#fafbfc",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             {isLoading ? (
               <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 6 }}>
                 <CircularProgress size={48} sx={{ mb: 2 }} />
@@ -350,6 +509,32 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           )}
         </Card>
       </Container>
+
+      {/* Exit Fullscreen Warning Dialog */}
+      <Dialog
+        open={showExitWarning}
+        onClose={() => setShowExitWarning(false)}
+        sx={{
+          "& .MuiDialog-paper": {
+            borderRadius: 3,
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.15)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: "1.2rem", pb: 1 }}>
+          ⚠️ Wawancara Masih Berlangsung
+        </DialogTitle>
+        <DialogContent sx={{ py: 2 }}>
+          <Typography>
+            Anda tidak dapat keluar dari mode fullscreen sampai sesi wawancara selesai. Harap selesaikan semua pertanyaan terlebih dahulu.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setShowExitWarning(false)} variant="contained" color="primary">
+            Saya Mengerti
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

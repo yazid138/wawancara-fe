@@ -37,10 +37,10 @@ export const interviewService = {
     return response.data.data;
   },
 
-  submitAnswer: async (id: number, answer: string, token: string) => {
-    const response = await api.post<ApiResponse<{ answer: Answer; score: any; nextQuestion: Question | null }>>(
+  submitAnswer: async (id: number, answer: string, questionId: number, token: string) => {
+    const response = await api.post<ApiResponse<{ answer: Answer; questionId: number; score: any; nextQuestion: Question | null }>>(
       `/interviews/${id}/answers`,
-      { answer },
+      { answer, questionId },
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data;

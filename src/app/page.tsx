@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -21,14 +21,6 @@ import {
 import { api, type ApiResponse } from "@/lib/api";
 import Navigation from "@/components/navigation";
 
-type BackendUser = {
-  id: number;
-  name: string;
-  username: string;
-  role: string;
-  createdAt: string;
-};
-
 type Interview = {
   id: number;
   status: string;
@@ -41,20 +33,7 @@ type Interview = {
 
 export default function Home() {
   const router = useRouter();
-  const { data: session, status } = useSession();
-
-  const { data, error, isLoading } = useSWR(
-    session?.accessToken ? ["me", session.accessToken] : null,
-    async ([, accessToken]) => {
-      const response = await api.get<ApiResponse<BackendUser>>("/auth/me", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      return response.data.data;
-    },
-  );
+  const { data: session } = useSession();
 
   const { data: interviews, isLoading: loadingInterviews } = useSWR(
     session?.accessToken ? ["interviews", session.accessToken] : null,
@@ -92,15 +71,6 @@ export default function Home() {
         {/* Header Section */}
         <Stack spacing={3} sx={{ mb: 5 }}>
           <Box>
-            <Chip
-              label="Dashboard"
-              sx={{
-                mb: 2,
-                backgroundColor: "rgba(16, 185, 129, 0.1)",
-                color: "primary.main",
-                fontWeight: 600,
-              }}
-            />
             <Typography
               variant="h2"
               sx={{
@@ -121,307 +91,6 @@ export default function Home() {
             </Typography>
           </Box>
         </Stack>
-
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          {/* Profile Cards */}
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                height: "100%",
-                border: "1px solid #e2e8f0",
-                background:
-                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
-                },
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600 }}
-                >
-                  NAMA PENGGUNA
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
-                  {isLoading ? (
-                    <Skeleton width="80%" />
-                  ) : (
-                    (data?.name ?? session?.user?.name)
-                  )}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                height: "100%",
-                border: "1px solid #e2e8f0",
-                background:
-                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
-                },
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600 }}
-                >
-                  USERNAME
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
-                  {isLoading ? (
-                    <Skeleton width="70%" />
-                  ) : (
-                    (data?.username ?? session?.user?.username)
-                  )}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                height: "100%",
-                border: "1px solid #e2e8f0",
-                background:
-                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
-                },
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600 }}
-                >
-                  ROLE
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
-                  {isLoading ? (
-                    <Skeleton width="60%" />
-                  ) : (
-                    (data?.role ?? session?.user?.role)
-                  )}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card
-              sx={{
-                height: "100%",
-                border: "1px solid #e2e8f0",
-                background:
-                  "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  boxShadow: "0 12px 24px rgba(16, 185, 129, 0.15)",
-                },
-              }}
-            >
-              <CardContent>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600 }}
-                >
-                  TOTAL INTERVIEW
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>
-                  {loadingInterviews ? (
-                    <Skeleton width="50%" />
-                  ) : (
-                    (interviews?.length ?? 0)
-                  )}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Main Content */}
-        <Grid container spacing={3}>
-          {/* Account Details */}
-          <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                border: "1px solid #e2e8f0",
-                height: "100%",
-                "&:hover": {
-                  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.08)",
-                },
-              }}
-            >
-              <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
-                <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
-                  📋 Detail Akun
-                </Typography>
-                <Typography
-                  color="text.secondary"
-                  sx={{ mb: 3, fontSize: "0.95rem" }}
-                >
-                  Informasi profil yang tersimpan di sistem.
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Stack spacing={2.5}>
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      sx={{ fontWeight: 600, color: "text.secondary" }}
-                    >
-                      ID PENGGUNA
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      {isLoading ? (
-                        <Skeleton width="40%" />
-                      ) : (
-                        (data?.id ?? session?.user?.id)
-                      )}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      sx={{ fontWeight: 600, color: "text.secondary" }}
-                    >
-                      NAMA LENGKAP
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      {isLoading ? (
-                        <Skeleton width="70%" />
-                      ) : (
-                        (data?.name ?? session?.user?.name)
-                      )}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      sx={{ fontWeight: 600, color: "text.secondary" }}
-                    >
-                      TANGGAL TERDAFTAR
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      {isLoading ? (
-                        <Skeleton width="60%" />
-                      ) : (
-                        new Date(
-                          data?.createdAt ?? session?.user?.createdAt,
-                        ).toLocaleDateString("id-ID", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })
-                      )}
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                {error && (
-                  <Alert severity="error" sx={{ mt: 3 }}>
-                    Gagal mengambil data profil
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Quick Actions */}
-          <Grid item xs={12} md={6}>
-            <Card
-              sx={{
-                border: "1px solid #e2e8f0",
-                height: "100%",
-                background:
-                  "linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(5, 150, 105, 0.03) 100%)",
-                "&:hover": {
-                  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.08)",
-                },
-              }}
-            >
-              <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
-                <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
-                  ⚡ Tindakan Cepat
-                </Typography>
-                <Typography
-                  color="text.secondary"
-                  sx={{ mb: 3, fontSize: "0.95rem" }}
-                >
-                  Kelola akun dan akses fitur utama.
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Stack spacing={2}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{
-                      py: 1.5,
-                      fontWeight: 600,
-                      borderColor: "#e2e8f0",
-                      "&:hover": {
-                        borderColor: "primary.main",
-                        backgroundColor: "rgba(16, 185, 129, 0.04)",
-                      },
-                    }}
-                  >
-                    ✏️ Edit Profil
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{
-                      py: 1.5,
-                      fontWeight: 600,
-                      borderColor: "#e2e8f0",
-                      "&:hover": {
-                        borderColor: "primary.main",
-                        backgroundColor: "rgba(16, 185, 129, 0.04)",
-                      },
-                    }}
-                  >
-                    🔐 Ubah Password
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    fullWidth
-                    onClick={() => signOut({ callbackUrl: "/login" })}
-                    sx={{
-                      py: 1.5,
-                      fontWeight: 600,
-                    }}
-                  >
-                    🚪 Logout
-                  </Button>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
 
         {/* Interview History */}
         <Box sx={{ mt: 4 }}>
@@ -453,7 +122,7 @@ export default function Home() {
               ) : interviews && interviews.length > 0 ? (
                 <Grid container spacing={2}>
                   {interviews.map((inv) => (
-                    <Grid item xs={12} sm={6} lg={4} key={inv.id}>
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={inv.id}>
                       <Paper
                         sx={{
                           p: 2.5,

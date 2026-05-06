@@ -120,7 +120,7 @@ export default function LoginClient() {
             calon magang dengan sistem yang efisien dan transparan.
           </Typography>
           <Divider flexItem sx={{ borderColor: "rgba(255,255,255,0.25)" }} />
-          <Stack direction="row" spacing={2} alignItems="flex-start">
+          <Stack direction="row" spacing={2} sx={{alignItems: 'flex-start'}}>
             <Avatar
               sx={{
                 bgcolor: "rgba(255,255,255,0.25)",
