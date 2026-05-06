@@ -100,41 +100,11 @@ export default function InternshipApplicationPage() {
 
     setLoadingPositionId(positionId);
 
-    try {
-      const response = await api.post<ApiResponse<StartInterviewResponse>>(
-        "/interviews",
-        {
-          companyId,
-          positionId,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${session.accessToken}`,
-          },
-        },
-      );
-
-      const interview = response.data.data;
-      setSubmitSuccess(
-        interview
-          ? `✓ Lamaran berhasil dibuat! Interview dimulai...`
-          : "Lamaran berhasil dibuat.",
-      );
-      
-      if (interview?.id) {
-        setTimeout(() => {
-          router.push(`/interview/${interview.id}`);
-        }, 1500);
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        setSubmitError(error.message);
-      } else {
-        setSubmitError("Gagal mengirim lamaran magang.");
-      }
-    } finally {
+    // Redirect to terms and conditions page
+    setTimeout(() => {
+      router.push(`/interview/terms?positionId=${positionId}&companyId=${companyId}`);
       setLoadingPositionId(null);
-    }
+    }, 500);
   };
 
   return (

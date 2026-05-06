@@ -51,7 +51,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
   const { data, error, isLoading, mutate } = useSWR(
     session?.accessToken ? ["interview", session.accessToken] : null,
-    fetcher
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      revalidateOnReconnect: false,
+    }
   );
 
   const formik = useFormik({
@@ -225,15 +230,14 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     <Box
       ref={containerRef}
       sx={{
-        minHeight: "100vh",
+        height: "100vh",
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
-        ...(isFullscreen ? { height: "100vh" } : {}),
       }}
     >
       <Navigation />
-      <Container maxWidth="md" sx={{ flexGrow: 1, py: 3, display: "flex", flexDirection: "column" }}>
+      <Container maxWidth="md" sx={{ flexGrow: 1, py: 3, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <Card
           elevation={0}
           sx={{
@@ -458,6 +462,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   value={formik.values.answer}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey && e.key === "Enter") {
+                      e.preventDefault();
+                      formik.handleSubmit();
+                    }
+                  }}
                   error={formik.touched.answer && Boolean(formik.errors.answer)}
                   helperText={formik.touched.answer && formik.errors.answer}
                   disabled={formik.isSubmitting || isLoading}
