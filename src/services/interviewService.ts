@@ -11,6 +11,8 @@ export type Answer = {
   content: string;
   createdAt: string;
   question: Question;
+  technicalScore?: { finalScore: number; feedback: string; reason: string } | null;
+  softSkillScore?: { finalScore: number; reason: string } | null;
 };
 
 export type InterviewHistory = {

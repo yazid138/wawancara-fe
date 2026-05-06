@@ -198,7 +198,20 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const messages: { sender: "AI" | "USER"; text: string; id: string | number }[] = [];
+  type MessageType = {
+    sender: "AI" | "USER";
+    text: string;
+    id: string | number;
+    scoreObj?: { score: number; reason: string } | null;
+  };
+  const messages: MessageType[] = [];
+
+  const isFinished = data?.history?.status === "FINISH";
+  const totalQuestions = data?.history?.answers?.length ?? 0;
+  
+  let totalScore = 0;
+  let scoredAnswersCount = 0;
+  const summaryPoints: string[] = [];
 
   if (data?.history) {
     data.history.answers.forEach((ans) => {
@@ -207,10 +220,25 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         text: ans.question.content,
         id: `q-${ans.question.id}-${ans.id}`,
       });
+      
+      let scoreObj = null;
+      if (ans.technicalScore) {
+        scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "" };
+        totalScore += ans.technicalScore.finalScore;
+        scoredAnswersCount++;
+        if (ans.technicalScore.feedback || ans.technicalScore.reason) summaryPoints.push(ans.technicalScore.feedback || ans.technicalScore.reason || "");
+      } else if (ans.softSkillScore) {
+        scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "" };
+        totalScore += ans.softSkillScore.finalScore;
+        scoredAnswersCount++;
+        if (ans.softSkillScore.reason) summaryPoints.push(ans.softSkillScore.reason);
+      }
+
       messages.push({
         sender: "USER",
         text: ans.content,
         id: `a-${ans.id}`,
+        scoreObj,
       });
     });
 
@@ -223,8 +251,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const isFinished = data?.history?.status === "FINISH";
-  const totalQuestions = data?.history?.answers?.length ?? 0;
+  const overallScore = scoredAnswersCount > 0 ? Math.round(totalScore / scoredAnswersCount) : 0;
 
   return (
     <Box
@@ -396,6 +423,18 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                         }}>
                           {msg.text}
                         </Typography>
+                        {isUser && isFinished && msg.scoreObj && (
+                          <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(255, 255, 255, 0.15)", borderRadius: 2 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 800, mb: 0.5, color: "#fff" }}>
+                              Skor Jawaban: {Math.round(msg.scoreObj.score)}/100
+                            </Typography>
+                            {msg.scoreObj.reason && (
+                              <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
+                                {msg.scoreObj.reason}
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
                       </Paper>
                       {isUser && (
                         <Avatar sx={{
@@ -414,12 +453,39 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   );
                 })}
                 {isFinished && (
-                  <Box sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    pt: 3,
-                    pb: 1,
-                  }}>
+                  <Box sx={{ pt: 3, pb: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        width: "100%",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 3,
+                        mb: 3,
+                        overflow: "hidden"
+                      }}
+                    >
+                      <Box sx={{ p: 2.5, bgcolor: "rgba(16, 185, 129, 0.08)", borderBottom: "1px solid rgba(16, 185, 129, 0.2)", display: "flex", justifyContent: "space-between", alignItems: "center", flexDirection: { xs: "column", sm: "row" }, gap: 2 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#059669" }}>
+                          📊 Hasil Penilaian Wawancara
+                        </Typography>
+                        <Chip label={`Skor Keseluruhan: ${overallScore}/100`} color="primary" sx={{ fontWeight: 800, fontSize: "1.05rem", py: 2.5, px: 1 }} />
+                      </Box>
+                      <Box sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                          📝 Ringkasan Evaluasi
+                        </Typography>
+                        <Stack spacing={2}>
+                          {summaryPoints.length > 0 ? summaryPoints.map((point, idx) => (
+                            <Box key={idx} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+                              <Typography color="primary" sx={{ fontWeight: 800, mt: "-2px" }}>•</Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>{point}</Typography>
+                            </Box>
+                          )) : (
+                            <Typography variant="body2" color="text.secondary">Belum ada ringkasan yang tersedia.</Typography>
+                          )}
+                        </Stack>
+                      </Box>
+                    </Card>
                     <Chip
                       label="✓ Sesi wawancara telah selesai"
                       color="success"
