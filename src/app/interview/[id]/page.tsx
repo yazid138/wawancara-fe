@@ -76,93 +76,6 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     },
   });
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [data]);
-
-  // Handle fullscreen lock
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = Boolean(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
-      );
-      setIsFullscreen(isCurrentlyFullscreen);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent ESC key if interview is not finished and fullscreen is active
-      if (isFullscreen && !data?.history?.status?.includes("FINISH") && e.key === "Escape") {
-        e.preventDefault();
-        setShowExitWarning(true);
-      }
-      // Prevent Alt+Tab, Alt+F4 on some browsers
-      if (!data?.history?.status?.includes("FINISH") && isFullscreen) {
-        if ((e.altKey && e.key === "Tab") || (e.altKey && e.key === "F4")) {
-          e.preventDefault();
-          setShowExitWarning(true);
-        }
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
-    document.addEventListener("msfullscreenchange", handleFullscreenChange);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("msfullscreenchange", handleFullscreenChange);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isFullscreen, data?.history?.status]);
-
-  // Handle page close attempt during interview
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isFullscreen && data?.history?.status !== "FINISH") {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [isFullscreen, data?.history?.status]);
-
-  // Auto-enter fullscreen on page load
-  useEffect(() => {
-    const autoEnterFullscreen = async () => {
-      if (!containerRef.current || isFullscreen) return;
-
-      try {
-        const elem = containerRef.current as any;
-        if (elem.requestFullscreen) {
-          await elem.requestFullscreen();
-        } else if (elem.webkitRequestFullscreen) {
-          await elem.webkitRequestFullscreen();
-        } else if (elem.mozRequestFullScreen) {
-          await elem.mozRequestFullScreen();
-        } else if (elem.msRequestFullscreen) {
-          await elem.msRequestFullscreen();
-        }
-      } catch (error) {
-        console.error("Auto fullscreen error:", error);
-      }
-    };
-
-    // Delay to ensure DOM is ready
-    const timer = setTimeout(autoEnterFullscreen, 500);
-    return () => clearTimeout(timer);
-  }, [isFullscreen]);
-
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
 
@@ -202,7 +115,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     sender: "AI" | "USER";
     text: string;
     id: string | number;
-    scoreObj?: { score: number; reason: string } | null;
+    scoreObj?: { score: number; reason: string; type: "technical" | "softskill" } | null;
   };
   const messages: MessageType[] = [];
 
@@ -223,13 +136,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       
       let scoreObj = null;
       if (ans.technicalScore) {
-        scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "" };
+        scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "", type: "technical" as const };
         totalScore += ans.technicalScore.finalScore;
         scoredAnswersCount++;
         if (ans.technicalScore.feedback || ans.technicalScore.reason) summaryPoints.push(ans.technicalScore.feedback || ans.technicalScore.reason || "");
       } else if (ans.softSkillScore) {
-        scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "" };
-        totalScore += ans.softSkillScore.finalScore;
+        scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "", type: "softskill" as const };
+        totalScore += (ans.softSkillScore.finalScore / 5) * 100;
         scoredAnswersCount++;
         if (ans.softSkillScore.reason) summaryPoints.push(ans.softSkillScore.reason);
       }
@@ -426,7 +339,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                         {isUser && isFinished && msg.scoreObj && (
                           <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(255, 255, 255, 0.15)", borderRadius: 2 }}>
                             <Typography variant="body2" sx={{ fontWeight: 800, mb: 0.5, color: "#fff" }}>
-                              Skor Jawaban: {Math.round(msg.scoreObj.score)}/100
+                              Skor Jawaban: {Math.round(msg.scoreObj.score)}/{msg.scoreObj.type === "softskill" ? "5" : "100"}
                             </Typography>
                             {msg.scoreObj.reason && (
                               <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
@@ -485,6 +398,16 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           )}
                         </Stack>
                       </Box>
+                      {data?.history?.resume && (
+                        <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                            📝 Resume Wawancara (AI)
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                            {data.history.resume}
+                          </Typography>
+                        </Box>
+                      )}
                     </Card>
                     <Chip
                       label="✓ Sesi wawancara telah selesai"
