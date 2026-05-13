@@ -84,6 +84,16 @@ export default function InternshipApplicationPage() {
     }
   );
 
+  const { data: interviews, isLoading: loadingInterviews } = useSWR(
+    session?.accessToken ? ["interviews", session.accessToken] : null,
+    async ([, accessToken]) => {
+      const response = await api.get<ApiResponse<any[]>>("/interviews", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return response.data.data || [];
+    }
+  );
+
   const applicantName = useMemo(
     () => profile?.name ?? session?.user?.name ?? "Calon Magang",
     [profile?.name, session?.user?.name],
@@ -308,32 +318,49 @@ export default function InternshipApplicationPage() {
                     <Divider />
 
                     <CardActions sx={{ p: 2, pt: 2 }}>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        fullWidth
-                        onClick={() => handleApply(pos.id, pos.companyId)}
-                        disabled={loadingPositionId === pos.id}
-                        sx={{
-                          borderRadius: 2,
-                          fontWeight: 700,
-                          py: 1.2,
-                          fontSize: "0.95rem",
-                          boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                        }}
-                      >
-                        {loadingPositionId === pos.id ? (
-                          <>
-                            <CircularProgress size={18} color="inherit" />
-                            Memproses...
-                          </>
-                        ) : (
-                          "▶️ Mulai Interview"
-                        )}
-                      </Button>
+                      {interviews?.some(inv => inv.positionId === pos.id && inv.companyId === pos.companyId) ? (
+                        <Button
+                          variant="outlined"
+                          color="inherit"
+                          fullWidth
+                          disabled
+                          sx={{
+                            borderRadius: 2,
+                            fontWeight: 700,
+                            py: 1.2,
+                            fontSize: "0.95rem",
+                          }}
+                        >
+                          ✓ Sudah Terdaftar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          fullWidth
+                          onClick={() => handleApply(pos.id, pos.companyId)}
+                          disabled={loadingPositionId === pos.id || loadingInterviews}
+                          sx={{
+                            borderRadius: 2,
+                            fontWeight: 700,
+                            py: 1.2,
+                            fontSize: "0.95rem",
+                            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          {loadingPositionId === pos.id ? (
+                            <>
+                              <CircularProgress size={18} color="inherit" />
+                              Memproses...
+                            </>
+                          ) : (
+                            "▶️ Mulai Interview"
+                          )}
+                        </Button>
+                      )}
                     </CardActions>
                   </Card>
                 </Grid>
