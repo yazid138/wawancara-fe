@@ -141,7 +141,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "", type: "technical" as const };
         totalScore += ans.technicalScore.finalScore;
         scoredAnswersCount++;
-        const feedback = ans.technicalScore.feedback || ans.technicalScore.reason;
+        const feedback = ans.technicalScore.reason || ans.technicalScore.feedback;
         if (feedback) {
           summaryPoints.push(`[${categoryName}] ${feedback}`);
         }
