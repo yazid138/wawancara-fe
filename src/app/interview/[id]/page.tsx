@@ -40,7 +40,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
 
-  const fetcher = async ([, token]: [string, string]) => {
+  const fetcher = async ([, , token]: [string, number, string]) => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
     let currentQ = null;
     if (history?.status !== "FINISH") {
@@ -50,7 +50,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   };
 
   const { data, error, isLoading, mutate } = useSWR(
-    session?.accessToken ? ["interview", session.accessToken] : null,
+    session?.accessToken ? ["interview", interviewId, session.accessToken] : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -135,16 +135,23 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       });
       
       let scoreObj = null;
+      const categoryName = (ans.question as any).category?.name || ans.question.type;
+      
       if (ans.technicalScore) {
         scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "", type: "technical" as const };
         totalScore += ans.technicalScore.finalScore;
         scoredAnswersCount++;
-        if (ans.technicalScore.feedback || ans.technicalScore.reason) summaryPoints.push(ans.technicalScore.feedback || ans.technicalScore.reason || "");
+        const feedback = ans.technicalScore.feedback || ans.technicalScore.reason;
+        if (feedback) {
+          summaryPoints.push(`[${categoryName}] ${feedback}`);
+        }
       } else if (ans.softSkillScore) {
         scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "", type: "softskill" as const };
         totalScore += (ans.softSkillScore.finalScore / 5) * 100;
         scoredAnswersCount++;
-        if (ans.softSkillScore.reason) summaryPoints.push(ans.softSkillScore.reason);
+        if (ans.softSkillScore.reason) {
+          summaryPoints.push(`[${categoryName}] ${ans.softSkillScore.reason}`);
+        }
       }
 
       messages.push({
