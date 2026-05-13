@@ -11,7 +11,11 @@ export type Answer = {
   content: string;
   createdAt: string;
   question: Question;
-  technicalScore?: { finalScore: number; feedback: string; reason: string } | null;
+  technicalScore?: {
+    finalScore: number;
+    feedback: string;
+    reason: string;
+  } | null;
   softSkillScore?: { finalScore: number; reason: string } | null;
 };
 
@@ -22,28 +26,47 @@ export type InterviewHistory = {
   answers: Answer[];
   company?: any;
   position?: any;
+  resume?: string;
 };
 
 export const interviewService = {
   getInterviewHistory: async (id: number, token: string) => {
-    const response = await api.get<ApiResponse<InterviewHistory>>(`/interviews/${id}/history`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data.data;
-  },
-  
-  getCurrentQuestion: async (id: number, token: string) => {
-    const response = await api.get<ApiResponse<Question | null>>(`/interviews/${id}/current`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.get<ApiResponse<InterviewHistory>>(
+      `/interviews/${id}/history`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     return response.data.data;
   },
 
-  submitAnswer: async (id: number, answer: string, questionId: number, token: string) => {
-    const response = await api.post<ApiResponse<{ answer: Answer; questionId: number; score: any; nextQuestion: Question | null }>>(
+  getCurrentQuestion: async (id: number, token: string) => {
+    const response = await api.get<ApiResponse<Question | null>>(
+      `/interviews/${id}/current`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    return response.data.data;
+  },
+
+  submitAnswer: async (
+    id: number,
+    answer: string,
+    questionId: number,
+    token: string,
+  ) => {
+    const response = await api.post<
+      ApiResponse<{
+        answer: Answer;
+        questionId: number;
+        score: any;
+        nextQuestion: Question | null;
+      }>
+    >(
       `/interviews/${id}/answers`,
       { answer, questionId },
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     return response.data;
   },
