@@ -325,8 +325,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           px: 3,
                           maxWidth: "85%",
                           borderRadius: 3,
-                          borderTopRightRadius: isUser ? 4 : 3,
-                          borderTopLeftRadius: !isUser ? 4 : 3,
+                          borderTopRightRadius: isUser && 4,
+                          borderTopLeftRadius: !isUser && 4,
                           bgcolor: isUser ? "#10b981" : "#ffffff",
                           color: isUser ? "white" : "text.primary",
                           boxShadow: isUser
