@@ -120,46 +120,65 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const messages: MessageType[] = [];
 
   const isFinished = data?.history?.status === "FINISH";
-  const totalQuestions = data?.history?.answers?.length ?? 0;
+  const aiChatsCount = data?.history?.chatHistories?.filter((ch: any) => ch.role === "AI").length || 0;
+  const totalQuestions = (data?.history?.answers?.length ?? 0) + aiChatsCount;
   
   let totalScore = 0;
   let scoredAnswersCount = 0;
   const summaryPoints: string[] = [];
 
   if (data?.history) {
-    data.history.answers.forEach((ans) => {
-      messages.push({
-        sender: "AI",
-        text: ans.question.content,
-        id: `q-${ans.question.id}-${ans.id}`,
-      });
-      
-      let scoreObj = null;
-      const categoryName = (ans.question as any).category?.name || ans.question.type;
-      
-      if (ans.technicalScore) {
-        scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "", type: "technical" as const };
-        totalScore += ans.technicalScore.finalScore;
-        scoredAnswersCount++;
-        const feedback = ans.technicalScore.reason || ans.technicalScore.feedback;
-        if (feedback) {
-          summaryPoints.push(`[${categoryName}] ${feedback}`);
-        }
-      } else if (ans.softSkillScore) {
-        scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "", type: "softskill" as const };
-        totalScore += (ans.softSkillScore.finalScore / 5) * 100;
-        scoredAnswersCount++;
-        if (ans.softSkillScore.reason) {
-          summaryPoints.push(`[${categoryName}] ${ans.softSkillScore.reason}`);
-        }
-      }
+    const allItems = [
+      ...(data.history.answers || []).map((ans: any) => ({ ...ans, isChat: false })),
+      ...(data.history.chatHistories || []).map((ch: any) => ({ ...ch, isChat: true })),
+    ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-      messages.push({
-        sender: "USER",
-        text: ans.content,
-        id: `a-${ans.id}`,
-        scoreObj,
-      });
+    allItems.forEach((item) => {
+      if (item.isChat) {
+        messages.push({
+          sender: item.role === "AI" ? "AI" : "USER",
+          text: item.content,
+          id: `chat-${item.id}`,
+        });
+      } else {
+        const ans = item;
+        const hasRephrasedQuestion = data?.history?.chatHistories?.some((ch: any) => ch.questionId === ans.questionId && ch.role === "AI");
+        
+        if (!hasRephrasedQuestion) {
+          messages.push({
+            sender: "AI",
+            text: ans.question.content,
+            id: `q-${ans.question.id}-${ans.id}`,
+          });
+        }
+        
+        let scoreObj = null;
+        const categoryName = (ans.question as any).category?.name || ans.question.type;
+        
+        if (ans.technicalScore) {
+          scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "", type: "technical" as const };
+          totalScore += ans.technicalScore.finalScore;
+          scoredAnswersCount++;
+          const feedback = ans.technicalScore.reason || ans.technicalScore.feedback;
+          if (feedback) {
+            summaryPoints.push(`[${categoryName}] ${feedback}`);
+          }
+        } else if (ans.softSkillScore) {
+          scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "", type: "softskill" as const };
+          totalScore += (ans.softSkillScore.finalScore / 5) * 100;
+          scoredAnswersCount++;
+          if (ans.softSkillScore.reason) {
+            summaryPoints.push(`[${categoryName}] ${ans.softSkillScore.reason}`);
+          }
+        }
+
+        messages.push({
+          sender: "USER",
+          text: ans.content,
+          id: `a-${ans.id}`,
+          scoreObj,
+        });
+      }
     });
 
     if (data.currentQ) {

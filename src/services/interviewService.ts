@@ -27,6 +27,7 @@ export type InterviewHistory = {
   company?: any;
   position?: any;
   resume?: string;
+  chatHistories?: any[]; 
 };
 
 export const interviewService = {
