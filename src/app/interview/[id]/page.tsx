@@ -182,11 +182,20 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     });
 
     if (data.currentQ) {
-      messages.push({
-        sender: "AI",
-        text: data.currentQ.content,
-        id: `q-current-${data.currentQ.id}`,
-      });
+      const alreadyRendered = data.history?.chatHistories?.some(
+        (ch: any) => 
+          (ch.questionId === data.currentQ.id && ch.role === "AI") || 
+          (data.currentQ.id === -1 && ch.role === "AI" && ch.content === data.currentQ.content) ||
+          ch.content === data.currentQ.content
+      );
+
+      if (!alreadyRendered) {
+        messages.push({
+          sender: "AI",
+          text: data.currentQ.content,
+          id: `q-current-${data.currentQ.id}`,
+        });
+      }
     }
   }
 
