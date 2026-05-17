@@ -236,18 +236,11 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         const matchingAns = ch.answer;
         const categoryName = (matchingAns.question as any).category?.name || matchingAns.question.type;
           
-        if (matchingAns.technicalScore) {
-          scoreObj = { score: matchingAns.technicalScore.finalScore, reason: matchingAns.technicalScore.feedback || matchingAns.technicalScore.reason || "", type: "technical" as const };
-          totalScore += matchingAns.technicalScore.finalScore;
-          scoredAnswersCount++;
-          const feedback = matchingAns.technicalScore.reason || matchingAns.technicalScore.feedback || "";
-          if (feedback) {
-            summaryPoints.push(`[${categoryName}] ${feedback}`);
-          }
-        } else if (matchingAns.softSkillScore) {
-          const feedbackText = matchingAns.softSkillScore.reason || matchingAns.softSkillScore.feedback || "";
-          scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: matchingAns.softSkillScore.feedback || "", type: "softskill" as const };
-          totalScore += matchingAns.softSkillScore.finalScore;
+        if (matchingAns.score) {
+          const s = matchingAns.score;
+          const feedbackText = s.reason || s.feedback || "";
+          scoreObj = { score: s.finalScore, reason: s.feedback, type: s.type === "SOFTSKILL" ? "softskill" : "technical" };
+          totalScore += s.finalScore;
           scoredAnswersCount++;
           if (feedbackText) {
             summaryPoints.push(`[${categoryName}] ${feedbackText}`);
