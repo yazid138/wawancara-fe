@@ -240,13 +240,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           scoreObj = { score: matchingAns.technicalScore.finalScore, reason: matchingAns.technicalScore.feedback || matchingAns.technicalScore.reason || "", type: "technical" as const };
           totalScore += matchingAns.technicalScore.finalScore;
           scoredAnswersCount++;
-          const feedback = matchingAns.technicalScore.reason || matchingAns.technicalScore.feedback;
+          const feedback = matchingAns.technicalScore.reason || matchingAns.technicalScore.feedback || "";
           if (feedback) {
             summaryPoints.push(`[${categoryName}] ${feedback}`);
           }
         } else if (matchingAns.softSkillScore) {
-          const feedbackText = matchingAns.softSkillScore.feedback || matchingAns.softSkillScore.reason;
-          scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: feedbackText || "", type: "softskill" as const };
+          const feedbackText = matchingAns.softSkillScore.reason || matchingAns.softSkillScore.feedback || "";
+          scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: matchingAns.softSkillScore.feedback || "", type: "softskill" as const };
           totalScore += matchingAns.softSkillScore.finalScore;
           scoredAnswersCount++;
           if (feedbackText) {
