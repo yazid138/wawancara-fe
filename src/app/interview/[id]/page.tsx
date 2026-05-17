@@ -43,6 +43,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
   const fetcher = async ([, , token]: [string, number, string]) => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
@@ -87,11 +88,18 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     });
 
     socketInstance.on("new-question", () => {
+      setIsSubmittingAnswer(false);
       mutate();
     });
 
     socketInstance.on("interview-finished", () => {
+      setIsSubmittingAnswer(false);
       mutate();
+    });
+
+    socketInstance.on("error", (err: any) => {
+      setIsSubmittingAnswer(false);
+      console.error(err.message);
     });
 
     setSocket(socketInstance);
@@ -101,6 +109,10 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     };
   }, [session?.accessToken, interviewId, mutate]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [data, isSubmittingAnswer]);
+
   const formik = useFormik({
     initialValues: { answer: "" },
     validationSchema: Yup.object({
@@ -109,6 +121,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     onSubmit: async (values, { resetForm }) => {
       if (!session?.accessToken || !data?.currentQ) return;
       try {
+        setIsSubmittingAnswer(true);
         if (socket && isSocketConnected) {
           socket.emit("submit-answer", {
             interviewId,
@@ -119,9 +132,11 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         } else {
           await interviewService.submitAnswer(interviewId, values.answer, data.currentQ.id, session.accessToken);
           resetForm();
+          setIsSubmittingAnswer(false);
           mutate();
         }
       } catch (error) {
+        setIsSubmittingAnswer(false);
         console.error("Gagal mengirim jawaban", error);
       }
     },
@@ -190,7 +205,15 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           }
         }
       } else {
-        uniqueChatHistories.push(ch);
+        const lastPushed = uniqueChatHistories[uniqueChatHistories.length - 1];
+        if (lastPushed && lastPushed.role === "USER" && lastPushed.content === ch.content) {
+          // Deduplicate consecutive identical user messages, keep the one with an answer object
+          if (ch.answer && !lastPushed.answer) {
+            uniqueChatHistories[uniqueChatHistories.length - 1] = ch;
+          }
+        } else {
+          uniqueChatHistories.push(ch);
+        }
       }
     });
     safeChatHistories = uniqueChatHistories;
@@ -205,57 +228,38 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const summaryPoints: string[] = [];
 
   if (data?.history) {
-    const allItems = [
-      ...(data.history.answers || []).map((ans: any) => ({ ...ans, isChat: false })),
-      ...safeChatHistories.map((ch: any) => ({ ...ch, isChat: true })),
-    ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const sortedChats = safeChatHistories;
 
-    allItems.forEach((item) => {
-      if (item.isChat) {
-        messages.push({
-          sender: item.role === "AI" ? "AI" : "USER",
-          text: item.content,
-          id: `chat-${item.id}`,
-        });
-      } else {
-        const ans = item;
-        const hasRephrasedQuestion = safeChatHistories.some((ch: any) => ch.questionId === ans.questionId && ch.role === "AI");
-        
-        if (!hasRephrasedQuestion) {
-          messages.push({
-            sender: "AI",
-            text: ans.question.content,
-            id: `q-${ans.question.id}-${ans.id}`,
-          });
-        }
-        
-        let scoreObj = null;
-        const categoryName = (ans.question as any).category?.name || ans.question.type;
-        
-        if (ans.technicalScore) {
-          scoreObj = { score: ans.technicalScore.finalScore, reason: ans.technicalScore.feedback || ans.technicalScore.reason || "", type: "technical" as const };
-          totalScore += ans.technicalScore.finalScore;
+    sortedChats.forEach((ch: any) => {
+      let scoreObj = null;
+      if (ch.role === "USER" && ch.answer) {
+        const matchingAns = ch.answer;
+        const categoryName = (matchingAns.question as any).category?.name || matchingAns.question.type;
+          
+        if (matchingAns.technicalScore) {
+          scoreObj = { score: matchingAns.technicalScore.finalScore, reason: matchingAns.technicalScore.feedback || matchingAns.technicalScore.reason || "", type: "technical" as const };
+          totalScore += matchingAns.technicalScore.finalScore;
           scoredAnswersCount++;
-          const feedback = ans.technicalScore.reason || ans.technicalScore.feedback;
+          const feedback = matchingAns.technicalScore.reason || matchingAns.technicalScore.feedback;
           if (feedback) {
             summaryPoints.push(`[${categoryName}] ${feedback}`);
           }
-        } else if (ans.softSkillScore) {
-          scoreObj = { score: ans.softSkillScore.finalScore, reason: ans.softSkillScore.reason || "", type: "softskill" as const };
-          totalScore += (ans.softSkillScore.finalScore / 5) * 100;
+        } else if (matchingAns.softSkillScore) {
+          scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: matchingAns.softSkillScore.reason || "", type: "softskill" as const };
+          totalScore += (matchingAns.softSkillScore.finalScore / 5) * 100;
           scoredAnswersCount++;
-          if (ans.softSkillScore.reason) {
-            summaryPoints.push(`[${categoryName}] ${ans.softSkillScore.reason}`);
+          if (matchingAns.softSkillScore.reason) {
+            summaryPoints.push(`[${categoryName}] ${matchingAns.softSkillScore.reason}`);
           }
         }
-
-        messages.push({
-          sender: "USER",
-          text: ans.content,
-          id: `a-${ans.id}`,
-          scoreObj,
-        });
       }
+
+      messages.push({
+        sender: ch.role,
+        text: ch.content,
+        id: `chat-${ch.id}`,
+        scoreObj,
+      });
     });
 
     if (data.currentQ) {
@@ -572,7 +576,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   }}
                   error={formik.touched.answer && Boolean(formik.errors.answer)}
                   helperText={formik.touched.answer && formik.errors.answer}
-                  disabled={formik.isSubmitting || isLoading}
+                  disabled={formik.isSubmitting || isLoading || isSubmittingAnswer}
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 2,
@@ -594,7 +598,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                     type="submit"
                     variant="contained"
                     color="primary"
-                    disabled={formik.isSubmitting || isLoading || !formik.values.answer.trim()}
+                    disabled={formik.isSubmitting || isLoading || isSubmittingAnswer || !formik.values.answer.trim()}
                     sx={{
                       px: 4,
                       py: 1.2,
@@ -606,7 +610,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                       boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
                     }}
                   >
-                    {formik.isSubmitting ? (
+                    {formik.isSubmitting || isSubmittingAnswer ? (
                       <>
                         <CircularProgress size={20} color="inherit" />
                         Mengirim...
