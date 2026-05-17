@@ -246,7 +246,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           }
         } else if (matchingAns.softSkillScore) {
           scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: matchingAns.softSkillScore.reason || "", type: "softskill" as const };
-          totalScore += (matchingAns.softSkillScore.finalScore / 5) * 100;
+          totalScore += matchingAns.softSkillScore.finalScore;
           scoredAnswersCount++;
           if (matchingAns.softSkillScore.reason) {
             summaryPoints.push(`[${categoryName}] ${matchingAns.softSkillScore.reason}`);
@@ -456,7 +456,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                         {isUser && isFinished && msg.scoreObj && (
                           <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(255, 255, 255, 0.15)", borderRadius: 2 }}>
                             <Typography variant="body2" sx={{ fontWeight: 800, mb: 0.5, color: "#fff" }}>
-                              Skor Jawaban: {Math.round(msg.scoreObj.score)}/{msg.scoreObj.type === "softskill" ? "5" : "100"}
+                              Skor Jawaban: {Math.round(msg.scoreObj.score)}/100
                             </Typography>
                             {msg.scoreObj.reason && (
                               <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
