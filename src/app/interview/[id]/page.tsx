@@ -245,11 +245,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
             summaryPoints.push(`[${categoryName}] ${feedback}`);
           }
         } else if (matchingAns.softSkillScore) {
-          scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: matchingAns.softSkillScore.reason || "", type: "softskill" as const };
+          const feedbackText = matchingAns.softSkillScore.feedback || matchingAns.softSkillScore.reason;
+          scoreObj = { score: matchingAns.softSkillScore.finalScore, reason: feedbackText || "", type: "softskill" as const };
           totalScore += matchingAns.softSkillScore.finalScore;
           scoredAnswersCount++;
-          if (matchingAns.softSkillScore.reason) {
-            summaryPoints.push(`[${categoryName}] ${matchingAns.softSkillScore.reason}`);
+          if (feedbackText) {
+            summaryPoints.push(`[${categoryName}] ${feedbackText}`);
           }
         }
       }
