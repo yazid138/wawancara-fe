@@ -29,6 +29,7 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import Navigation from "@/components/navigation";
 import { interviewService } from "@/services/interviewService";
+import { io as SocketClient, Socket } from "socket.io-client";
 
 export default function InterviewChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -39,6 +40,9 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
+  
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
 
   const fetcher = async ([, , token]: [string, number, string]) => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
@@ -59,6 +63,44 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }
   );
 
+  useEffect(() => {
+    if (!session?.accessToken) return;
+
+    const baseURL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+    const socketInstance = SocketClient(baseURL, {
+      auth: {
+        token: session.accessToken,
+      },
+    });
+
+    socketInstance.on("connect", () => {
+      setIsSocketConnected(true);
+      socketInstance.emit("join-interview", interviewId);
+    });
+
+    socketInstance.on("disconnect", () => {
+      setIsSocketConnected(false);
+    });
+
+    socketInstance.on("answer-saved", () => {
+      mutate();
+    });
+
+    socketInstance.on("new-question", () => {
+      mutate();
+    });
+
+    socketInstance.on("interview-finished", () => {
+      mutate();
+    });
+
+    setSocket(socketInstance);
+
+    return () => {
+      socketInstance.disconnect();
+    };
+  }, [session?.accessToken, interviewId, mutate]);
+
   const formik = useFormik({
     initialValues: { answer: "" },
     validationSchema: Yup.object({
@@ -67,9 +109,18 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     onSubmit: async (values, { resetForm }) => {
       if (!session?.accessToken || !data?.currentQ) return;
       try {
-        await interviewService.submitAnswer(interviewId, values.answer, data.currentQ.id, session.accessToken);
-        resetForm();
-        mutate();
+        if (socket && isSocketConnected) {
+          socket.emit("submit-answer", {
+            interviewId,
+            answer: values.answer,
+            questionId: data.currentQ.id,
+          });
+          resetForm();
+        } else {
+          await interviewService.submitAnswer(interviewId, values.answer, data.currentQ.id, session.accessToken);
+          resetForm();
+          mutate();
+        }
       } catch (error) {
         console.error("Gagal mengirim jawaban", error);
       }
@@ -119,9 +170,35 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   };
   const messages: MessageType[] = [];
 
+  let safeChatHistories = data?.history?.chatHistories || [];
+  if (data?.history) {
+    const uniqueChatHistories: any[] = [];
+    const seenAiQuestionIds = new Set();
+    const seenAiContents = new Set();
+    
+    safeChatHistories.forEach((ch: any) => {
+      if (ch.role === "AI") {
+        if (ch.questionId) {
+          if (!seenAiQuestionIds.has(ch.questionId)) {
+            seenAiQuestionIds.add(ch.questionId);
+            uniqueChatHistories.push(ch);
+          }
+        } else {
+          if (!seenAiContents.has(ch.content)) {
+            seenAiContents.add(ch.content);
+            uniqueChatHistories.push(ch);
+          }
+        }
+      } else {
+        uniqueChatHistories.push(ch);
+      }
+    });
+    safeChatHistories = uniqueChatHistories;
+  }
+
   const isFinished = data?.history?.status === "FINISH";
-  const aiChatsCount = data?.history?.chatHistories?.filter((ch: any) => ch.role === "AI").length || 0;
-  const totalQuestions = (data?.history?.answers?.length ?? 0) + aiChatsCount;
+  const aiChatsCount = safeChatHistories.filter((ch: any) => ch.role === "AI").length;
+  const totalQuestions = aiChatsCount;
   
   let totalScore = 0;
   let scoredAnswersCount = 0;
@@ -130,7 +207,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   if (data?.history) {
     const allItems = [
       ...(data.history.answers || []).map((ans: any) => ({ ...ans, isChat: false })),
-      ...(data.history.chatHistories || []).map((ch: any) => ({ ...ch, isChat: true })),
+      ...safeChatHistories.map((ch: any) => ({ ...ch, isChat: true })),
     ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     allItems.forEach((item) => {
@@ -142,7 +219,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         });
       } else {
         const ans = item;
-        const hasRephrasedQuestion = data?.history?.chatHistories?.some((ch: any) => ch.questionId === ans.questionId && ch.role === "AI");
+        const hasRephrasedQuestion = safeChatHistories.some((ch: any) => ch.questionId === ans.questionId && ch.role === "AI");
         
         if (!hasRephrasedQuestion) {
           messages.push({
@@ -183,7 +260,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
     if (data.currentQ) {
       const currentQ = data.currentQ;
-      const alreadyRendered = data.history?.chatHistories?.some(
+      const alreadyRendered = safeChatHistories.some(
         (ch: any) => 
           (ch.questionId === currentQ.id && ch.role === "AI") || 
           (currentQ.id === -1 && ch.role === "AI" && ch.content === currentQ.content) ||
@@ -258,7 +335,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
                 </IconButton>
                 <Chip
-                  label={isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions + (messages.length > 0 ? 1 : 0)}`}
+                  label={isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions}`}
                   color={isFinished ? "success" : "primary"}
                   variant="outlined"
                   sx={{ fontWeight: 600 }}
