@@ -181,7 +181,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     sender: "AI" | "USER";
     text: string;
     id: string | number;
-    scoreObj?: { score: number; reason: string; type: "technical" | "softskill" } | null;
+    scoreObj?: { score: number; reason: string; type: string } | null;
   };
   const messages: MessageType[] = [];
 
@@ -231,7 +231,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     const sortedChats = safeChatHistories;
 
     sortedChats.forEach((ch: any) => {
-      let scoreObj = null;
+      let scoreObj: { score: number; reason: string; type: "technical" | "softskill" } | null = null;
       if (ch.role === "USER" && ch.answer) {
         const matchingAns = ch.answer;
         const categoryName = (matchingAns.question as any).category?.name || matchingAns.question.type;
