@@ -28,8 +28,116 @@ import {
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import Navigation from "@/components/navigation";
-import { interviewService } from "@/services/interviewService";
+import { interviewService, type InterviewHistory, type Question } from "@/services/interviewService";
 import { io as SocketClient, Socket } from "socket.io-client";
+
+type ChatHistory = {
+  id: string | number;
+  role: "AI" | "USER";
+  content: string;
+  questionId?: number | null;
+  answer?: any;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+};
+
+type InterviewViewData = {
+  history: InterviewHistory;
+  currentQ: Question | null;
+};
+
+type AnswerSavedPayload = {
+  questionId: number;
+  answer: any;
+};
+
+type AnswerScoredPayload = {
+  answerId: number;
+  questionId: number;
+  score: {
+    finalScore: number;
+    feedback?: string;
+    reason?: string;
+    type?: string;
+  };
+};
+
+const normalizeChatHistories = (chatHistories: ChatHistory[] = []) => {
+  const uniqueChatHistories: ChatHistory[] = [];
+  const seenAiQuestionIds = new Set<number>();
+  const seenAiContents = new Set<string>();
+
+  chatHistories.forEach((ch) => {
+    if (ch.role === "AI") {
+      if (ch.questionId) {
+        if (!seenAiQuestionIds.has(ch.questionId)) {
+          seenAiQuestionIds.add(ch.questionId);
+          uniqueChatHistories.push(ch);
+        }
+      } else if (!seenAiContents.has(ch.content)) {
+        seenAiContents.add(ch.content);
+        uniqueChatHistories.push(ch);
+      }
+      return;
+    }
+
+    const lastPushed = uniqueChatHistories[uniqueChatHistories.length - 1];
+    if (lastPushed && lastPushed.role === "USER" && lastPushed.content === ch.content) {
+      if (ch.answer && !lastPushed.answer) {
+        uniqueChatHistories[uniqueChatHistories.length - 1] = ch;
+      }
+      return;
+    }
+
+    uniqueChatHistories.push(ch);
+  });
+
+  return uniqueChatHistories;
+};
+
+const upsertChatHistory = (chatHistories: ChatHistory[], nextChat: ChatHistory) => {
+  const nextChatHistories = [...chatHistories];
+  const matchIndex = nextChatHistories.findIndex((ch) => {
+    if (ch.role !== nextChat.role) return false;
+
+    if (nextChat.questionId !== undefined && nextChat.questionId !== null) {
+      return ch.questionId === nextChat.questionId;
+    }
+
+    return ch.content === nextChat.content;
+  });
+
+  if (matchIndex >= 0) {
+    nextChatHistories[matchIndex] = {
+      ...nextChatHistories[matchIndex],
+      ...nextChat,
+      answer: nextChat.answer ?? nextChatHistories[matchIndex].answer,
+    };
+  } else {
+    nextChatHistories.push(nextChat);
+  }
+
+  return normalizeChatHistories(nextChatHistories);
+};
+
+const applyAnswerScore = (chatHistories: ChatHistory[], payload: AnswerScoredPayload) =>
+  chatHistories.map((ch) => {
+    if (ch.role !== "USER" || !ch.answer) {
+      return ch;
+    }
+
+    if (ch.answer.id === payload.answerId || ch.questionId === payload.questionId) {
+      return {
+        ...ch,
+        answer: {
+          ...ch.answer,
+          score: payload.score,
+        },
+      };
+    }
+
+    return ch;
+  });
 
 export default function InterviewChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -40,21 +148,26 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
+  const [interviewData, setInterviewData] = useState<InterviewViewData | null>(null);
   
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
-  const fetcher = async ([, , token]: [string, number, string]) => {
+  const fetcher = async ([, , token]: [string, number, string]): Promise<InterviewViewData> => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
-    let currentQ = null;
-    if (history?.status !== "FINISH") {
-      currentQ = await interviewService.getCurrentQuestion(interviewId, token);
+    if (!history) {
+      throw new Error("Gagal mengambil riwayat wawancara");
+    }
+    let currentQ: Question | null = null;
+    if (history.status !== "FINISH") {
+      const q = await interviewService.getCurrentQuestion(interviewId, token);
+      currentQ = q ?? null;
     }
     return { history, currentQ };
   };
 
-  const { data, error, isLoading, mutate } = useSWR(
+  const { data, error, isLoading } = useSWR<InterviewViewData>(
     session?.accessToken ? ["interview", interviewId, session.accessToken] : null,
     fetcher,
     {
@@ -63,6 +176,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       revalidateOnReconnect: false,
     }
   );
+
+  useEffect(() => {
+    if (data) {
+      setInterviewData(data);
+    }
+  }, [data]);
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -83,18 +202,104 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       setIsSocketConnected(false);
     });
 
-    socketInstance.on("answer-saved", () => {
-      mutate();
+    socketInstance.on("answer-saved", (payload: AnswerSavedPayload) => {
+      setInterviewData((current) => {
+        if (!current) return current;
+
+        const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
+        const answerContent = typeof payload.answer === "string" ? payload.answer : payload.answer?.content ?? "";
+
+        if (payload.questionId === -1) {
+          return {
+            ...current,
+            history: {
+              ...current.history,
+              chatHistories: upsertChatHistory(chatHistories, {
+                id: `user-chat-intro-${Date.now()}`,
+                role: "USER",
+                content: answerContent,
+                questionId: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }),
+            },
+          };
+        }
+
+        const savedAnswer = typeof payload.answer === "object" && payload.answer ? payload.answer : null;
+
+        return {
+          ...current,
+          history: {
+            ...current.history,
+            chatHistories: upsertChatHistory(chatHistories, {
+              id: savedAnswer?.id ?? `user-chat-${payload.questionId}-${Date.now()}`,
+              role: "USER",
+              content: answerContent,
+              questionId: payload.questionId,
+              answer: savedAnswer ?? undefined,
+              createdAt: savedAnswer?.createdAt ?? new Date().toISOString(),
+              updatedAt: savedAnswer?.createdAt ?? new Date().toISOString(),
+            }),
+          },
+        };
+      });
     });
 
-    socketInstance.on("new-question", () => {
+    socketInstance.on("new-question", (nextQuestion: Question | null) => {
+      setInterviewData((current) => {
+        if (!current || !nextQuestion) return current;
+
+        const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
+
+        return {
+          ...current,
+          currentQ: nextQuestion,
+          history: {
+            ...current.history,
+            chatHistories: upsertChatHistory(chatHistories, {
+              id: `ai-chat-${nextQuestion.id}-${Date.now()}`,
+              role: "AI",
+              content: nextQuestion.content,
+              questionId: nextQuestion.id === -1 ? null : nextQuestion.id,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }),
+          },
+        };
+      });
+
       setIsSubmittingAnswer(false);
-      mutate();
+    });
+
+    socketInstance.on("answer-scored", (payload: AnswerScoredPayload) => {
+      setInterviewData((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          history: {
+            ...current.history,
+            chatHistories: applyAnswerScore((current.history.chatHistories || []) as ChatHistory[], payload),
+          },
+        };
+      });
     });
 
     socketInstance.on("interview-finished", () => {
       setIsSubmittingAnswer(false);
-      mutate();
+      setInterviewData((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          currentQ: null,
+          history: {
+            ...current.history,
+            status: "FINISH",
+          },
+        };
+      });
     });
 
     socketInstance.on("error", (err: any) => {
@@ -107,11 +312,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     return () => {
       socketInstance.disconnect();
     };
-  }, [session?.accessToken, interviewId, mutate]);
+  }, [session?.accessToken, interviewId]);
+
+  const activeData = interviewData ?? data;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [data, isSubmittingAnswer]);
+  }, [activeData, isSubmittingAnswer]);
 
   const formik = useFormik({
     initialValues: { answer: "" },
@@ -119,21 +326,61 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       answer: Yup.string().required("Jawaban tidak boleh kosong"),
     }),
     onSubmit: async (values, { resetForm }) => {
-      if (!session?.accessToken || !data?.currentQ) return;
+      if (!session?.accessToken || !activeData?.currentQ) return;
       try {
         setIsSubmittingAnswer(true);
         if (socket && isSocketConnected) {
           socket.emit("submit-answer", {
             interviewId,
             answer: values.answer,
-            questionId: data.currentQ.id,
+            questionId: activeData.currentQ.id,
           });
           resetForm();
         } else {
-          await interviewService.submitAnswer(interviewId, values.answer, data.currentQ.id, session.accessToken);
+          const response = await interviewService.submitAnswer(interviewId, values.answer, activeData.currentQ.id, session.accessToken);
+          const submission = response.data;
+          if (!submission) {
+            throw new Error("Gagal menyimpan jawaban");
+          }
+
+          setInterviewData((current) => {
+            if (!current) return current;
+
+            const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
+            const nextChatHistories = upsertChatHistory(chatHistories, {
+              id: submission.answer?.id ?? `fallback-user-chat-${interviewId}-${Date.now()}`,
+              role: "USER",
+              content: submission.answer?.content ?? values.answer,
+              questionId: submission.questionId,
+              answer: submission.answer,
+              createdAt: submission.answer?.createdAt ?? new Date().toISOString(),
+              updatedAt: submission.answer?.createdAt ?? new Date().toISOString(),
+            });
+
+            if (submission.nextQuestion) {
+              return {
+                ...current,
+                currentQ: submission.nextQuestion,
+                history: {
+                  ...current.history,
+                  chatHistories: nextChatHistories,
+                },
+              };
+            }
+
+            return {
+              ...current,
+              currentQ: null,
+              history: {
+                ...current.history,
+                status: "FINISH",
+                chatHistories: nextChatHistories,
+              },
+            };
+          });
+
           resetForm();
           setIsSubmittingAnswer(false);
-          mutate();
         }
       } catch (error) {
         setIsSubmittingAnswer(false);
@@ -158,7 +405,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           await elem.msRequestFullscreen();
         }
       } else {
-        if (data?.history?.status === "FINISH") {
+        if (activeData?.history?.status === "FINISH") {
           if (document.exitFullscreen) {
             await document.exitFullscreen();
           } else if ((document as any).webkitExitFullscreen) {
@@ -185,8 +432,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   };
   const messages: MessageType[] = [];
 
-  let safeChatHistories = data?.history?.chatHistories || [];
-  if (data?.history) {
+  let safeChatHistories = activeData?.history?.chatHistories || [];
+  if (activeData?.history) {
     const uniqueChatHistories: any[] = [];
     const seenAiQuestionIds = new Set();
     const seenAiContents = new Set();
@@ -219,7 +466,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     safeChatHistories = uniqueChatHistories;
   }
 
-  const isFinished = data?.history?.status === "FINISH";
+  const isFinished = activeData?.history?.status === "FINISH";
   const aiChatsCount = safeChatHistories.filter((ch: any) => ch.role === "AI").length;
   const totalQuestions = aiChatsCount;
   
@@ -227,14 +474,16 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   let scoredAnswersCount = 0;
   const summaryPoints: string[] = [];
 
-  if (data?.history) {
+  if (activeData?.history) {
     const sortedChats = safeChatHistories;
 
     sortedChats.forEach((ch: any) => {
       let scoreObj: { score: number; reason: string; type: "technical" | "softskill" } | null = null;
       if (ch.role === "USER" && ch.answer) {
         const matchingAns = ch.answer;
-        const categoryName = (matchingAns.question as any).category?.name || matchingAns.question.type;
+        const categoryName = matchingAns.question
+          ? ((matchingAns.question as any).category?.name || matchingAns.question.type)
+          : "";
           
         if (matchingAns.score) {
           const s = matchingAns.score;
@@ -256,8 +505,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       });
     });
 
-    if (data.currentQ) {
-      const currentQ = data.currentQ;
+    if (activeData.currentQ) {
+      const currentQ = activeData.currentQ;
       const alreadyRendered = safeChatHistories.some(
         (ch: any) => 
           (ch.questionId === currentQ.id && ch.role === "AI") || 
@@ -509,13 +758,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           )}
                         </Stack>
                       </Box>
-                      {data?.history?.resume && (
+                      {activeData?.history?.resume && (
                         <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
                             📝 Resume Wawancara (AI)
                           </Typography>
                           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                            {data.history.resume}
+                            {activeData.history.resume}
                           </Typography>
                         </Box>
                       )}
