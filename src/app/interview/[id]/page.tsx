@@ -199,20 +199,6 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }, 1000);
   };
 
-  // Mulai timer saat data pertama kali dimuat dan ada pertanyaan aktif
-  useEffect(() => {
-    if (data?.currentQ && data.history.status !== "FINISH") {
-      currentQuestionIdRef.current = data.currentQ.id;
-      startTimer();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  // Cleanup timer saat unmount
-  useEffect(() => {
-    return () => stopTimer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const fetcher = async ([, , token]: [string, number, string]): Promise<InterviewViewData> => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
@@ -243,7 +229,20 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }
   }, [data]);
 
+  // Mulai timer saat data pertama kali dimuat dan ada pertanyaan aktif
+  useEffect(() => {
+    if (data?.currentQ && data.history.status !== "FINISH") {
+      currentQuestionIdRef.current = data.currentQ.id;
+      startTimer();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
+  // Cleanup timer saat unmount
+  useEffect(() => {
+    return () => stopTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!session?.accessToken) return;
 
