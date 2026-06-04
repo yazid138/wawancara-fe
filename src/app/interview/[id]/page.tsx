@@ -146,13 +146,73 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
+  const ANSWER_TIME_LIMIT = 90; // 90 detik = 1.5 menit
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [interviewData, setInterviewData] = useState<InterviewViewData | null>(null);
+  const [skippedNotification, setSkippedNotification] = useState(false);
   
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
+
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState<number>(ANSWER_TIME_LIMIT);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const currentQuestionIdRef = useRef<number | null>(null);
+  const interviewIdRef = useRef<number>(interviewId);
+
+  const stopTimer = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    setIsTimerActive(false);
+  };
+
+  const startTimer = () => {
+    stopTimer();
+    setTimeLeft(ANSWER_TIME_LIMIT);
+    setIsTimerActive(true);
+
+    timerIntervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerIntervalRef.current!);
+          timerIntervalRef.current = null;
+          setIsTimerActive(false);
+
+          // Auto-skip: emit ke socket
+          const sock = socketRef.current;
+          const qId = currentQuestionIdRef.current;
+          const iId = interviewIdRef.current;
+          if (sock && sock.connected && qId !== null) {
+            sock.emit("skip-question", { interviewId: iId, questionId: qId });
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Mulai timer saat data pertama kali dimuat dan ada pertanyaan aktif
+  useEffect(() => {
+    if (data?.currentQ && data.history.status !== "FINISH") {
+      currentQuestionIdRef.current = data.currentQ.id;
+      startTimer();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  // Cleanup timer saat unmount
+  useEffect(() => {
+    return () => stopTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetcher = async ([, , token]: [string, number, string]): Promise<InterviewViewData> => {
     const history = await interviewService.getInterviewHistory(interviewId, token);
@@ -182,6 +242,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       setInterviewData(data);
     }
   }, [data]);
+
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -269,6 +330,9 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         };
       });
 
+      // Start/reset timer untuk pertanyaan baru
+      currentQuestionIdRef.current = nextQuestion?.id ?? null;
+      startTimer();
       setIsSubmittingAnswer(false);
     });
 
@@ -288,6 +352,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
     socketInstance.on("interview-finished", () => {
       setIsSubmittingAnswer(false);
+      stopTimer();
       setInterviewData((current) => {
         if (!current) return current;
 
@@ -307,7 +372,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       console.error(err.message);
     });
 
+    socketInstance.on("question-skipped", () => {
+      setSkippedNotification(true);
+      setTimeout(() => setSkippedNotification(false), 4000);
+    });
+
     setSocket(socketInstance);
+    socketRef.current = socketInstance;
 
     return () => {
       socketInstance.disconnect();
@@ -329,6 +400,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       if (!session?.accessToken || !activeData?.currentQ) return;
       try {
         setIsSubmittingAnswer(true);
+        stopTimer(); // Stop timer saat user submit
         if (socket && isSocketConnected) {
           socket.emit("submit-answer", {
             interviewId,
@@ -439,6 +511,9 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     const seenAiContents = new Set();
     
     safeChatHistories.forEach((ch: any) => {
+      // Filter: jangan tampilkan pesan USER dengan konten "[SKIPPED]"
+      if (ch.role === "USER" && ch.content === "[SKIPPED]") return;
+
       if (ch.role === "AI") {
         if (ch.questionId) {
           if (!seenAiQuestionIds.has(ch.questionId)) {
@@ -465,6 +540,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     });
     safeChatHistories = uniqueChatHistories;
   }
+
 
   const isFinished = activeData?.history?.status === "FINISH";
   const aiChatsCount = safeChatHistories.filter((ch: any) => ch.role === "AI").length;
@@ -788,6 +864,28 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
           <Divider />
 
+          {/* Timeout Notification */}
+          {skippedNotification && (
+            <Box sx={{
+              mx: { xs: 2, sm: 3 },
+              mb: 1,
+              px: 2,
+              py: 1.2,
+              bgcolor: "rgba(239, 68, 68, 0.08)",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              borderRadius: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              animation: "fadeIn 0.3s ease",
+              "@keyframes fadeIn": { from: { opacity: 0, transform: "translateY(-6px)" }, to: { opacity: 1, transform: "translateY(0)" } },
+            }}>
+              <Typography variant="body2" sx={{ color: "#ef4444", fontWeight: 600 }}>
+                ⏰ Waktu habis! Pertanyaan dilewati secara otomatis.
+              </Typography>
+            </Box>
+          )}
+
           {/* Input Area */}
           {!isFinished && (
             <Box
@@ -800,6 +898,68 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
               }}
             >
               <Stack spacing={2}>
+                {/* Timer */}
+                {isTimerActive && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box sx={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
+                      <svg width="44" height="44" style={{ transform: "rotate(-90deg)" }}>
+                        <circle cx="22" cy="22" r="18" fill="none" stroke="#e2e8f0" strokeWidth="3.5" />
+                        <circle
+                          cx="22"
+                          cy="22"
+                          r="18"
+                          fill="none"
+                          stroke={timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "#10b981"}
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 18}`}
+                          strokeDashoffset={`${2 * Math.PI * 18 * (1 - timeLeft / ANSWER_TIME_LIMIT)}`}
+                          style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
+                        />
+                      </svg>
+                      <Typography
+                        sx={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
+                          fontSize: "0.7rem",
+                          fontWeight: 800,
+                          color: timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "#10b981",
+                          animation: timeLeft <= 10 ? "pulse 1s infinite" : "none",
+                          "@keyframes pulse": {
+                            "0%, 100%": { opacity: 1 },
+                            "50%": { opacity: 0.5 },
+                          },
+                        }}
+                      >
+                        {timeLeft}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "text.secondary" }}>
+                        {timeLeft <= 10
+                          ? "⚠️ Segera jawab! Waktu hampir habis"
+                          : timeLeft <= 30
+                          ? "🕐 Sisa waktu sedikit"
+                          : "⏱ Waktu menjawab"}
+                      </Typography>
+                      <Box sx={{ mt: 0.5, height: 4, bgcolor: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+                        <Box sx={{
+                          height: "100%",
+                          width: `${(timeLeft / ANSWER_TIME_LIMIT) * 100}%`,
+                          bgcolor: timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "#10b981",
+                          borderRadius: 2,
+                          transition: "width 1s linear, background-color 0.5s ease",
+                        }} />
+                      </Box>
+                    </Box>
+                    <Typography variant="caption" sx={{ color: "text.disabled", flexShrink: 0 }}>
+                      {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+                    </Typography>
+                  </Box>
+                )}
+
                 <TextField
                   fullWidth
                   multiline
@@ -866,6 +1026,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
               </Stack>
             </Box>
           )}
+
         </Card>
       </Container>
 
