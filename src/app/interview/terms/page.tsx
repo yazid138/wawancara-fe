@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -16,6 +16,13 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  OutlinedInput,
+  ListItemText,
+  Chip,
 } from "@mui/material";
 import Navigation from "@/components/navigation";
 import { api, type ApiResponse } from "@/lib/api";
@@ -40,10 +47,41 @@ function TermsContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [fetchingCategories, setFetchingCategories] = useState(true);
+
   const positionId = searchParams.get("positionId");
+
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get<ApiResponse<{ id: number; name: string }[]>>(
+          "/questions/categories",
+          {
+            headers: {
+              Authorization: `Bearer ${session.accessToken}`,
+            },
+          }
+        );
+        setCategories(response.data.data || []);
+      } catch (err) {
+        console.error("Gagal mengambil kategori:", err);
+      } finally {
+        setFetchingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, [session?.accessToken]);
   const companyId = searchParams.get("companyId");
 
   const handleStart = async () => {
+    if (selectedCategories.length < 3) {
+      setError("Silakan pilih minimal 3 kategori pertanyaan untuk melanjutkan.");
+      return;
+    }
+
     if (!agreed) {
       setError("Anda harus menyetujui syarat dan ketentuan untuk melanjutkan.");
       return;
@@ -68,6 +106,7 @@ function TermsContent() {
         {
           companyId: Number(companyId),
           positionId: Number(positionId),
+          categoryIds: selectedCategories,
         },
         {
           headers: {
@@ -138,6 +177,50 @@ function TermsContent() {
                 </Typography>
               </li>
             </ol>
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+              Pilih Kategori Pertanyaan
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Pilih minimal 3 kategori pertanyaan yang ingin Anda hadapi selama wawancara (pertanyaan Intro & General akan otomatis muncul).
+            </Typography>
+            {fetchingCategories ? (
+              <CircularProgress size={24} />
+            ) : (
+              <FormControl fullWidth sx={{ mt: 1 }}>
+                <InputLabel id="category-select-label">Kategori Pertanyaan</InputLabel>
+                <Select
+                  labelId="category-select-label"
+                  id="category-select"
+                  multiple
+                  value={selectedCategories}
+                  onChange={(e) => {
+                    const value = e.target.value as number[];
+                    setSelectedCategories(value);
+                  }}
+                  input={<OutlinedInput label="Kategori Pertanyaan" />}
+                  renderValue={(selected) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {selected.map((value) => {
+                        const cat = categories.find(c => c.id === value);
+                        return <Chip key={value} label={cat ? cat.name : value} size="small" />;
+                      })}
+                    </Box>
+                  )}
+                >
+                  {categories.map((cat) => (
+                    <MenuItem key={cat.id} value={cat.id}>
+                      <Checkbox checked={selectedCategories.indexOf(cat.id) > -1} />
+                      <ListItemText primary={cat.name} sx={{ textTransform: 'capitalize' }} />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           </Box>
 
           <Divider />

@@ -157,6 +157,11 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
 
+  const [finalResumeInput, setFinalResumeInput] = useState("");
+  const [isSavingFinalResume, setIsSavingFinalResume] = useState(false);
+  const [saveFinalResumeSuccess, setSaveFinalResumeSuccess] = useState(false);
+  const [saveFinalResumeError, setSaveFinalResumeError] = useState("");
+
   // Timer state
   const [timeLeft, setTimeLeft] = useState<number>(ANSWER_TIME_LIMIT);
   const [isTimerActive, setIsTimerActive] = useState(false);
@@ -384,11 +389,47 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     };
   }, [session?.accessToken, interviewId]);
 
-  const activeData = interviewData ?? data;
+    const activeData = interviewData ?? data;
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeData, isSubmittingAnswer]);
+    useEffect(() => {
+      if (activeData?.history?.finalResume) {
+        setFinalResumeInput(activeData.history.finalResume);
+      }
+    }, [activeData?.history?.finalResume]);
+
+    const handleSaveFinalResume = async () => {
+      if (!session?.accessToken) return;
+      try {
+        setIsSavingFinalResume(true);
+        setSaveFinalResumeSuccess(false);
+        setSaveFinalResumeError("");
+        await interviewService.updateFinalResume(
+          interviewId,
+          finalResumeInput,
+          session.accessToken
+        );
+        setInterviewData((current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            history: {
+              ...current.history,
+              finalResume: finalResumeInput,
+            },
+          };
+        });
+        setSaveFinalResumeSuccess(true);
+      } catch (error) {
+        console.error("Gagal menyimpan resume final:", error);
+        setSaveFinalResumeError("Gagal menyimpan resume final. Silakan coba lagi.");
+      } finally {
+        setIsSavingFinalResume(false);
+      }
+    };
+
+    useEffect(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [activeData, isSubmittingAnswer]);
 
   const formik = useFormik({
     initialValues: { answer: "" },
@@ -843,6 +884,67 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           </Typography>
                         </Box>
                       )}
+
+                      <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                          ✍️ Resume Final (Hasil Akhir)
+                        </Typography>
+                        <TextField
+                          fullWidth
+                          multiline
+                          minRows={4}
+                          maxRows={10}
+                          placeholder="Masukkan resume final hasil wawancara di sini..."
+                          value={finalResumeInput}
+                          onChange={(e) => setFinalResumeInput(e.target.value)}
+                          disabled={isSavingFinalResume}
+                          sx={{
+                            mb: 2,
+                            "& .MuiOutlinedInput-root": {
+                              borderRadius: 2,
+                              border: "1px solid #e2e8f0",
+                              backgroundColor: "#fafbfc",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                borderColor: "#10b981",
+                              },
+                              "&.Mui-focused": {
+                                borderColor: "#10b981",
+                                backgroundColor: "#ffffff",
+                              },
+                            },
+                          }}
+                        />
+                        {saveFinalResumeSuccess && (
+                          <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                            Resume final berhasil disimpan!
+                          </Alert>
+                        )}
+                        {saveFinalResumeError && (
+                          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                            {saveFinalResumeError}
+                          </Alert>
+                        )}
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={handleSaveFinalResume}
+                          disabled={isSavingFinalResume || !finalResumeInput.trim()}
+                          sx={{
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 3,
+                            py: 1,
+                            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                          }}
+                        >
+                          {isSavingFinalResume ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : (
+                            "Simpan Resume Final"
+                          )}
+                        </Button>
+                      </Box>
                     </Card>
                     <Chip
                       label="✓ Sesi wawancara telah selesai"
