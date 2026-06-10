@@ -27,6 +27,7 @@ export type InterviewHistory = {
   company?: any;
   position?: any;
   resume?: string;
+  finalResume?: string;
   chatHistories?: any[]; 
 };
 
@@ -70,5 +71,35 @@ export const interviewService = {
       { headers: { Authorization: `Bearer ${token}` } },
     );
     return response.data;
+  },
+
+  finishInterview: async (
+    id: number,
+    token: string,
+    finalResume?: string,
+  ) => {
+    const response = await api.post<
+      ApiResponse<InterviewHistory>
+    >(
+      `/interviews/${id}/finish`,
+      finalResume ? { finalResume } : {},
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data.data;
+  },
+
+  updateFinalResume: async (
+    id: number,
+    token: string,
+    finalResume: string,
+  ) => {
+    const response = await api.put<
+      ApiResponse<InterviewHistory>
+    >(
+      `/interviews/${id}/final-resume`,
+      { finalResume },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data.data;
   },
 };

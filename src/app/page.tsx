@@ -24,7 +24,7 @@ import Navigation from "@/components/navigation";
 type Interview = {
   id: number;
   status: string;
-  currentIndex: number;
+  _count?: { answers: number };
   createdAt: string;
   updatedAt: string;
   company: { name: string };
@@ -188,7 +188,7 @@ export default function Home() {
                               variant="caption"
                               color="text.secondary"
                             >
-                              Progress: {inv.currentIndex} / soal
+                              Soal dijawab: {inv._count?.answers ?? 0} soal
                             </Typography>
                             <Typography
                               variant="caption"

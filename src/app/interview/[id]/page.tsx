@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState, type FormEvent } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { useFormik } from "formik";
@@ -28,7 +28,11 @@ import {
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import Navigation from "@/components/navigation";
-import { interviewService, type InterviewHistory, type Question } from "@/services/interviewService";
+import {
+  interviewService,
+  type InterviewHistory,
+  type Question,
+} from "@/services/interviewService";
 import { io as SocketClient, Socket } from "socket.io-client";
 
 type ChatHistory = {
@@ -82,7 +86,11 @@ const normalizeChatHistories = (chatHistories: ChatHistory[] = []) => {
     }
 
     const lastPushed = uniqueChatHistories[uniqueChatHistories.length - 1];
-    if (lastPushed && lastPushed.role === "USER" && lastPushed.content === ch.content) {
+    if (
+      lastPushed &&
+      lastPushed.role === "USER" &&
+      lastPushed.content === ch.content
+    ) {
       if (ch.answer && !lastPushed.answer) {
         uniqueChatHistories[uniqueChatHistories.length - 1] = ch;
       }
@@ -95,7 +103,10 @@ const normalizeChatHistories = (chatHistories: ChatHistory[] = []) => {
   return uniqueChatHistories;
 };
 
-const upsertChatHistory = (chatHistories: ChatHistory[], nextChat: ChatHistory) => {
+const upsertChatHistory = (
+  chatHistories: ChatHistory[],
+  nextChat: ChatHistory,
+) => {
   const nextChatHistories = [...chatHistories];
   const matchIndex = nextChatHistories.findIndex((ch) => {
     if (ch.role !== nextChat.role) return false;
@@ -120,13 +131,19 @@ const upsertChatHistory = (chatHistories: ChatHistory[], nextChat: ChatHistory) 
   return normalizeChatHistories(nextChatHistories);
 };
 
-const applyAnswerScore = (chatHistories: ChatHistory[], payload: AnswerScoredPayload) =>
+const applyAnswerScore = (
+  chatHistories: ChatHistory[],
+  payload: AnswerScoredPayload,
+) =>
   chatHistories.map((ch) => {
     if (ch.role !== "USER" || !ch.answer) {
       return ch;
     }
 
-    if (ch.answer.id === payload.answerId || ch.questionId === payload.questionId) {
+    if (
+      ch.answer.id === payload.answerId ||
+      ch.questionId === payload.questionId
+    ) {
       return {
         ...ch,
         answer: {
@@ -139,20 +156,28 @@ const applyAnswerScore = (chatHistories: ChatHistory[], payload: AnswerScoredPay
     return ch;
   });
 
-export default function InterviewChatPage({ params }: { params: Promise<{ id: string }> }) {
+export default function InterviewChatPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const interviewId = parseInt(id, 10);
   const { data: session } = useSession();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const ANSWER_TIME_LIMIT = 90; // 90 detik = 1.5 menit
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
-  const [interviewData, setInterviewData] = useState<InterviewViewData | null>(null);
+  const [interviewData, setInterviewData] = useState<InterviewViewData | null>(
+    null,
+  );
   const [skippedNotification, setSkippedNotification] = useState(false);
-  
+  const [finalResume, setFinalResume] = useState("");
+  const [submittedFinalResume, setSubmittedFinalResume] = useState("");
+
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
@@ -199,9 +224,15 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }, 1000);
   };
 
-
-  const fetcher = async ([, , token]: [string, number, string]): Promise<InterviewViewData> => {
-    const history = await interviewService.getInterviewHistory(interviewId, token);
+  const fetcher = async ([, , token]: [
+    string,
+    number,
+    string,
+  ]): Promise<InterviewViewData> => {
+    const history = await interviewService.getInterviewHistory(
+      interviewId,
+      token,
+    );
     if (!history) {
       throw new Error("Gagal mengambil riwayat wawancara");
     }
@@ -214,13 +245,15 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   };
 
   const { data, error, isLoading } = useSWR<InterviewViewData>(
-    session?.accessToken ? ["interview", interviewId, session.accessToken] : null,
+    session?.accessToken
+      ? ["interview", interviewId, session.accessToken]
+      : null,
     fetcher,
     {
       revalidateOnFocus: false,
       revalidateIfStale: false,
       revalidateOnReconnect: false,
-    }
+    },
   );
 
   useEffect(() => {
@@ -266,8 +299,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       setInterviewData((current) => {
         if (!current) return current;
 
-        const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
-        const answerContent = typeof payload.answer === "string" ? payload.answer : payload.answer?.content ?? "";
+        const chatHistories = (current.history.chatHistories ||
+          []) as ChatHistory[];
+        const answerContent =
+          typeof payload.answer === "string"
+            ? payload.answer
+            : (payload.answer?.content ?? "");
 
         if (payload.questionId === -1) {
           return {
@@ -286,14 +323,19 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           };
         }
 
-        const savedAnswer = typeof payload.answer === "object" && payload.answer ? payload.answer : null;
+        const savedAnswer =
+          typeof payload.answer === "object" && payload.answer
+            ? payload.answer
+            : null;
 
         return {
           ...current,
           history: {
             ...current.history,
             chatHistories: upsertChatHistory(chatHistories, {
-              id: savedAnswer?.id ?? `user-chat-${payload.questionId}-${Date.now()}`,
+              id:
+                savedAnswer?.id ??
+                `user-chat-${payload.questionId}-${Date.now()}`,
               role: "USER",
               content: answerContent,
               questionId: payload.questionId,
@@ -310,7 +352,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       setInterviewData((current) => {
         if (!current || !nextQuestion) return current;
 
-        const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
+        const chatHistories = (current.history.chatHistories ||
+          []) as ChatHistory[];
 
         return {
           ...current,
@@ -343,7 +386,10 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           ...current,
           history: {
             ...current.history,
-            chatHistories: applyAnswerScore((current.history.chatHistories || []) as ChatHistory[], payload),
+            chatHistories: applyAnswerScore(
+              (current.history.chatHistories || []) as ChatHistory[],
+              payload,
+            ),
           },
         };
       });
@@ -385,6 +431,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   }, [session?.accessToken, interviewId]);
 
   const activeData = interviewData ?? data;
+  const persistedFinalResume = activeData?.history?.finalResume ?? "";
+
+  useEffect(() => {
+    if (activeData?.history?.finalResume !== undefined) {
+      setFinalResume(activeData.history.finalResume ?? "");
+    }
+  }, [activeData?.history?.finalResume]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -408,7 +461,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           });
           resetForm();
         } else {
-          const response = await interviewService.submitAnswer(interviewId, values.answer, activeData.currentQ.id, session.accessToken);
+          const response = await interviewService.submitAnswer(
+            interviewId,
+            values.answer,
+            activeData.currentQ.id,
+            session.accessToken,
+          );
           const submission = response.data;
           if (!submission) {
             throw new Error("Gagal menyimpan jawaban");
@@ -417,15 +475,20 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           setInterviewData((current) => {
             if (!current) return current;
 
-            const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
+            const chatHistories = (current.history.chatHistories ||
+              []) as ChatHistory[];
             const nextChatHistories = upsertChatHistory(chatHistories, {
-              id: submission.answer?.id ?? `fallback-user-chat-${interviewId}-${Date.now()}`,
+              id:
+                submission.answer?.id ??
+                `fallback-user-chat-${interviewId}-${Date.now()}`,
               role: "USER",
               content: submission.answer?.content ?? values.answer,
               questionId: submission.questionId,
               answer: submission.answer,
-              createdAt: submission.answer?.createdAt ?? new Date().toISOString(),
-              updatedAt: submission.answer?.createdAt ?? new Date().toISOString(),
+              createdAt:
+                submission.answer?.createdAt ?? new Date().toISOString(),
+              updatedAt:
+                submission.answer?.createdAt ?? new Date().toISOString(),
             });
 
             if (submission.nextQuestion) {
@@ -495,6 +558,36 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const handleFinalResumeSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedFinalResume = finalResume.trim();
+    if (!trimmedFinalResume || !session?.accessToken) return;
+
+    try {
+      const updatedInterview = await interviewService.updateFinalResume(
+        interviewId,
+        session.accessToken,
+        trimmedFinalResume,
+      );
+
+      setSubmittedFinalResume(trimmedFinalResume);
+      setInterviewData((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          history: {
+            ...current.history,
+            finalResume: updatedInterview?.finalResume ?? trimmedFinalResume,
+          },
+        };
+      });
+    } catch (error) {
+      console.error("Gagal menyimpan final resume", error);
+    }
+  };
+
   type MessageType = {
     sender: "AI" | "USER";
     text: string;
@@ -508,7 +601,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     const uniqueChatHistories: any[] = [];
     const seenAiQuestionIds = new Set();
     const seenAiContents = new Set();
-    
+
     safeChatHistories.forEach((ch: any) => {
       // Filter: jangan tampilkan pesan USER dengan konten "[SKIPPED]"
       if (ch.role === "USER" && ch.content === "[SKIPPED]") return;
@@ -527,7 +620,11 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         }
       } else {
         const lastPushed = uniqueChatHistories[uniqueChatHistories.length - 1];
-        if (lastPushed && lastPushed.role === "USER" && lastPushed.content === ch.content) {
+        if (
+          lastPushed &&
+          lastPushed.role === "USER" &&
+          lastPushed.content === ch.content
+        ) {
           // Deduplicate consecutive identical user messages, keep the one with an answer object
           if (ch.answer && !lastPushed.answer) {
             uniqueChatHistories[uniqueChatHistories.length - 1] = ch;
@@ -540,11 +637,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     safeChatHistories = uniqueChatHistories;
   }
 
-
   const isFinished = activeData?.history?.status === "FINISH";
-  const aiChatsCount = safeChatHistories.filter((ch: any) => ch.role === "AI").length;
+  const aiChatsCount = safeChatHistories.filter(
+    (ch: any) => ch.role === "AI",
+  ).length;
   const totalQuestions = aiChatsCount;
-  
+
   let totalScore = 0;
   let scoredAnswersCount = 0;
   const summaryPoints: string[] = [];
@@ -553,17 +651,26 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     const sortedChats = safeChatHistories;
 
     sortedChats.forEach((ch: any) => {
-      let scoreObj: { score: number; reason: string; type: "technical" | "softskill" } | null = null;
+      let scoreObj: {
+        score: number;
+        reason: string;
+        type: "technical" | "softskill";
+      } | null = null;
       if (ch.role === "USER" && ch.answer) {
         const matchingAns = ch.answer;
         const categoryName = matchingAns.question
-          ? ((matchingAns.question as any).category?.name || matchingAns.question.type)
+          ? (matchingAns.question as any).category?.name ||
+            matchingAns.question.type
           : "";
-          
+
         if (matchingAns.score) {
           const s = matchingAns.score;
           const feedbackText = s.reason || s.feedback || "";
-          scoreObj = { score: s.finalScore, reason: s.feedback, type: s.type === "SOFTSKILL" ? "softskill" : "technical" };
+          scoreObj = {
+            score: s.finalScore,
+            reason: s.reason || s.feedback || "",
+            type: s.type === "SOFTSKILL" ? "softskill" : "technical",
+          };
           totalScore += s.finalScore;
           scoredAnswersCount++;
           if (feedbackText) {
@@ -583,10 +690,12 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     if (activeData.currentQ) {
       const currentQ = activeData.currentQ;
       const alreadyRendered = safeChatHistories.some(
-        (ch: any) => 
-          (ch.questionId === currentQ.id && ch.role === "AI") || 
-          (currentQ.id === -1 && ch.role === "AI" && ch.content === currentQ.content) ||
-          ch.content === currentQ.content
+        (ch: any) =>
+          (ch.questionId === currentQ.id && ch.role === "AI") ||
+          (currentQ.id === -1 &&
+            ch.role === "AI" &&
+            ch.content === currentQ.content) ||
+          ch.content === currentQ.content,
       );
 
       if (!alreadyRendered) {
@@ -599,7 +708,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const overallScore = scoredAnswersCount > 0 ? Math.round(totalScore / scoredAnswersCount) : 0;
+  const overallScore =
+    scoredAnswersCount > 0 ? Math.round(totalScore / scoredAnswersCount) : 0;
 
   return (
     <Box
@@ -612,7 +722,16 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       }}
     >
       <Navigation />
-      <Container maxWidth="md" sx={{ flexGrow: 1, py: 3, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <Container
+        maxWidth="md"
+        sx={{
+          flexGrow: 1,
+          py: 3,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+        }}
+      >
         <Card
           elevation={0}
           sx={{
@@ -628,12 +747,19 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           }}
         >
           {/* Header */}
-          <Box sx={{
-            p: { xs: 2.5, sm: 3.5 },
-            borderBottom: "1px solid #e2e8f0",
-            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
-          }}>
-            <Stack direction="row" sx={{justifyContent: 'space-between', alignItems: 'start'}} spacing={2}>
+          <Box
+            sx={{
+              p: { xs: 2.5, sm: 3.5 },
+              borderBottom: "1px solid #e2e8f0",
+              background:
+                "linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%)",
+            }}
+          >
+            <Stack
+              direction="row"
+              sx={{ justifyContent: "space-between", alignItems: "start" }}
+              spacing={2}
+            >
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>
                   🎤 Sesi Wawancara
@@ -642,11 +768,13 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   Jawab pertanyaan dengan jelas dan profesional.
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                 <IconButton
                   onClick={toggleFullscreen}
                   size="small"
-                  title={isFullscreen ? "Keluar Fullscreen" : "Masuk Fullscreen"}
+                  title={
+                    isFullscreen ? "Keluar Fullscreen" : "Masuk Fullscreen"
+                  }
                   sx={{
                     color: "primary.main",
                     "&:hover": {
@@ -657,7 +785,9 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
                 </IconButton>
                 <Chip
-                  label={isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions}`}
+                  label={
+                    isFinished ? "✓ Selesai" : `Pertanyaan ${totalQuestions}`
+                  }
                   color={isFinished ? "success" : "primary"}
                   variant="outlined"
                   sx={{ fontWeight: 600 }}
@@ -668,18 +798,23 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
           {/* Progress Bar */}
           {!isFinished && (
-            <Box sx={{
-              height: 4,
-              background: "#e2e8f0",
-              position: "relative",
-              overflow: "hidden",
-            }}>
-              <Box sx={{
-                height: "100%",
-                background: "linear-gradient(90deg, #10b981 0%, #059669 100%)",
-                width: `${Math.min((totalQuestions / 10) * 100, 95)}%`,
-                transition: "width 0.3s ease",
-              }} />
+            <Box
+              sx={{
+                height: 4,
+                background: "#e2e8f0",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                sx={{
+                  height: "100%",
+                  background:
+                    "linear-gradient(90deg, #10b981 0%, #059669 100%)",
+                  width: `${Math.min((totalQuestions / 10) * 100, 95)}%`,
+                  transition: "width 0.3s ease",
+                }}
+              />
             </Box>
           )}
 
@@ -698,9 +833,19 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
             }}
           >
             {isLoading ? (
-              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 6 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 6,
+                }}
+              >
                 <CircularProgress size={48} sx={{ mb: 2 }} />
-                <Typography color="text.secondary">Memuat data wawancara...</Typography>
+                <Typography color="text.secondary">
+                  Memuat data wawancara...
+                </Typography>
               </Box>
             ) : error ? (
               <Alert severity="error" sx={{ borderRadius: 2 }}>
@@ -717,32 +862,40 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                 {messages.map((msg, idx) => {
                   const isUser = msg.sender === "USER";
                   return (
-                    <Box key={msg.id} sx={{
-                      display: "flex",
-                      justifyContent: isUser ? "flex-end" : "flex-start",
-                      gap: 1.5,
-                      animation: "slideIn 0.3s ease",
-                      "@keyframes slideIn": {
-                        from: {
-                          opacity: 0,
-                          transform: isUser ? "translateX(20px)" : "translateX(-20px)",
+                    <Box
+                      key={msg.id}
+                      sx={{
+                        display: "flex",
+                        justifyContent: isUser ? "flex-end" : "flex-start",
+                        gap: 1.5,
+                        animation: "slideIn 0.3s ease",
+                        "@keyframes slideIn": {
+                          from: {
+                            opacity: 0,
+                            transform: isUser
+                              ? "translateX(20px)"
+                              : "translateX(-20px)",
+                          },
+                          to: {
+                            opacity: 1,
+                            transform: "translateX(0)",
+                          },
                         },
-                        to: {
-                          opacity: 1,
-                          transform: "translateX(0)",
-                        },
-                      },
-                    }}>
+                      }}
+                    >
                       {!isUser && (
-                        <Avatar sx={{
-                          bgcolor: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                          width: 40,
-                          height: 40,
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                          boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                          flexShrink: 0,
-                        }}>
+                        <Avatar
+                          sx={{
+                            bgcolor:
+                              "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                            width: 40,
+                            height: 40,
+                            fontWeight: 700,
+                            fontSize: "1rem",
+                            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                            flexShrink: 0,
+                          }}
+                        >
                           🤖
                         </Avatar>
                       )}
@@ -764,20 +917,35 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           wordWrap: "break-word",
                         }}
                       >
-                        <Typography sx={{
-                          whiteSpace: "pre-wrap",
-                          lineHeight: 1.6,
-                          fontSize: { xs: "0.95rem", sm: "1rem" },
-                        }}>
+                        <Typography
+                          sx={{
+                            whiteSpace: "pre-wrap",
+                            lineHeight: 1.6,
+                            fontSize: { xs: "0.95rem", sm: "1rem" },
+                          }}
+                        >
                           {msg.text}
                         </Typography>
                         {isUser && isFinished && msg.scoreObj && (
-                          <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(255, 255, 255, 0.15)", borderRadius: 2 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 800, mb: 0.5, color: "#fff" }}>
+                          <Box
+                            sx={{
+                              mt: 1.5,
+                              p: 1.5,
+                              bgcolor: "rgba(255, 255, 255, 0.15)",
+                              borderRadius: 2,
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 800, mb: 0.5, color: "#fff" }}
+                            >
                               Skor Jawaban: {Math.round(msg.scoreObj.score)}/100
                             </Typography>
                             {msg.scoreObj.reason && (
-                              <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
+                              <Typography
+                                variant="body2"
+                                sx={{ opacity: 0.9, color: "#fff" }}
+                              >
                                 {msg.scoreObj.reason}
                               </Typography>
                             )}
@@ -785,15 +953,17 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                         )}
                       </Paper>
                       {isUser && (
-                        <Avatar sx={{
-                          bgcolor: "#059669",
-                          width: 40,
-                          height: 40,
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                          boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)",
-                          flexShrink: 0,
-                        }}>
+                        <Avatar
+                          sx={{
+                            bgcolor: "#059669",
+                            width: 40,
+                            height: 40,
+                            fontWeight: 700,
+                            fontSize: "1rem",
+                            boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)",
+                            flexShrink: 0,
+                          }}
+                        >
                           👤
                         </Avatar>
                       )}
@@ -801,7 +971,15 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   );
                 })}
                 {isFinished && (
-                  <Box sx={{ pt: 3, pb: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <Box
+                    sx={{
+                      pt: 3,
+                      pb: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
                     <Card
                       elevation={0}
                       sx={{
@@ -809,41 +987,170 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                         border: "1px solid #e2e8f0",
                         borderRadius: 3,
                         mb: 3,
-                        overflow: "hidden"
+                        overflow: "hidden",
                       }}
                     >
-                      <Box sx={{ p: 2.5, bgcolor: "rgba(16, 185, 129, 0.08)", borderBottom: "1px solid rgba(16, 185, 129, 0.2)", display: "flex", justifyContent: "space-between", alignItems: "center", flexDirection: { xs: "column", sm: "row" }, gap: 2 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#059669" }}>
+                      <Box
+                        sx={{
+                          p: 2.5,
+                          bgcolor: "rgba(16, 185, 129, 0.08)",
+                          borderBottom: "1px solid rgba(16, 185, 129, 0.2)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexDirection: { xs: "column", sm: "row" },
+                          gap: 2,
+                        }}
+                      >
+                        <Typography
+                          variant="h6"
+                          sx={{ fontWeight: 800, color: "#059669" }}
+                        >
                           📊 Hasil Penilaian Wawancara
                         </Typography>
-                        <Chip label={`Skor Keseluruhan: ${overallScore}/100`} color="primary" sx={{ fontWeight: 800, fontSize: "1.05rem", py: 2.5, px: 1 }} />
+                        <Chip
+                          label={`Skor Keseluruhan: ${overallScore}/100`}
+                          color="primary"
+                          sx={{
+                            fontWeight: 800,
+                            fontSize: "1.05rem",
+                            py: 2.5,
+                            px: 1,
+                          }}
+                        />
                       </Box>
                       <Box sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{ fontWeight: 700, mb: 2 }}
+                        >
                           📝 Ringkasan Evaluasi
                         </Typography>
                         <Stack spacing={2}>
-                          {summaryPoints.length > 0 ? summaryPoints.map((point, idx) => (
-                            <Box key={idx} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
-                              <Typography color="primary" sx={{ fontWeight: 800, mt: "-2px" }}>•</Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>{point}</Typography>
-                            </Box>
-                          )) : (
-                            <Typography variant="body2" color="text.secondary">Belum ada ringkasan yang tersedia.</Typography>
+                          {summaryPoints.length > 0 ? (
+                            summaryPoints.map((point, idx) => (
+                              <Box
+                                key={idx}
+                                sx={{
+                                  display: "flex",
+                                  gap: 1.5,
+                                  alignItems: "flex-start",
+                                }}
+                              >
+                                <Typography
+                                  color="primary"
+                                  sx={{ fontWeight: 800, mt: "-2px" }}
+                                >
+                                  •
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ lineHeight: 1.6 }}
+                                >
+                                  {point}
+                                </Typography>
+                              </Box>
+                            ))
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              Belum ada ringkasan yang tersedia.
+                            </Typography>
                           )}
                         </Stack>
                       </Box>
                       {activeData?.history?.resume && (
-                        <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                        <Box
+                          sx={{
+                            p: { xs: 2.5, sm: 3.5 },
+                            borderTop: "1px solid #e2e8f0",
+                          }}
+                        >
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: 700, mb: 2 }}
+                          >
                             📝 Resume Wawancara (AI)
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}
+                          >
                             {activeData.history.resume}
                           </Typography>
                         </Box>
                       )}
                     </Card>
+                    <Box
+                      component="form"
+                      onSubmit={handleFinalResumeSubmit}
+                      sx={{
+                        width: "100%",
+                        mb: 3,
+                        p: { xs: 2.5, sm: 3 },
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 3,
+                        bgcolor: "#ffffff",
+                      }}
+                    >
+                      <Stack spacing={2}>
+                        <Box>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: 700, mb: 0.5 }}
+                          >
+                            ✍️ Final Resume
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Tulis final resume untuk disimpan ke kolom
+                            finalResume pada tabel interview.
+                          </Typography>
+                        </Box>
+                        <TextField
+                          fullWidth
+                          multiline
+                          minRows={3}
+                          maxRows={6}
+                          value={finalResume}
+                          onChange={(event) =>
+                            setFinalResume(event.target.value)
+                          }
+                          placeholder="Contoh: Kandidat menunjukkan pemahaman yang baik, komunikasi cukup jelas, dan layak untuk lanjut ke tahap berikutnya."
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              borderRadius: 2,
+                              backgroundColor: "#fafbfc",
+                            },
+                          }}
+                        />
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={2}
+                          sx={{ justifyContent: "flex-end" }}
+                        >
+                          <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={!(finalResume || persistedFinalResume).trim()}
+                            sx={{
+                              px: 4,
+                              py: 1.2,
+                              fontWeight: 700,
+                              borderRadius: 2,
+                              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                            }}
+                          >
+                            Submit Final Resume
+                          </Button>
+                        </Stack>
+                        {submittedFinalResume && (
+                          <Alert severity="success" sx={{ borderRadius: 2 }}>
+                            Final resume tersimpan.
+                          </Alert>
+                        )}
+                      </Stack>
+                    </Box>
                     <Chip
                       label="✓ Sesi wawancara telah selesai"
                       color="success"
@@ -865,21 +1172,29 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
           {/* Timeout Notification */}
           {skippedNotification && (
-            <Box sx={{
-              mx: { xs: 2, sm: 3 },
-              mb: 1,
-              px: 2,
-              py: 1.2,
-              bgcolor: "rgba(239, 68, 68, 0.08)",
-              border: "1px solid rgba(239, 68, 68, 0.25)",
-              borderRadius: 2,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              animation: "fadeIn 0.3s ease",
-              "@keyframes fadeIn": { from: { opacity: 0, transform: "translateY(-6px)" }, to: { opacity: 1, transform: "translateY(0)" } },
-            }}>
-              <Typography variant="body2" sx={{ color: "#ef4444", fontWeight: 600 }}>
+            <Box
+              sx={{
+                mx: { xs: 2, sm: 3 },
+                mb: 1,
+                px: 2,
+                py: 1.2,
+                bgcolor: "rgba(239, 68, 68, 0.08)",
+                border: "1px solid rgba(239, 68, 68, 0.25)",
+                borderRadius: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                animation: "fadeIn 0.3s ease",
+                "@keyframes fadeIn": {
+                  from: { opacity: 0, transform: "translateY(-6px)" },
+                  to: { opacity: 1, transform: "translateY(0)" },
+                },
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{ color: "#ef4444", fontWeight: 600 }}
+              >
                 ⏰ Waktu habis! Pertanyaan dilewati secara otomatis.
               </Typography>
             </Box>
@@ -900,20 +1215,47 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                 {/* Timer */}
                 {isTimerActive && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Box sx={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
-                      <svg width="44" height="44" style={{ transform: "rotate(-90deg)" }}>
-                        <circle cx="22" cy="22" r="18" fill="none" stroke="#e2e8f0" strokeWidth="3.5" />
+                    <Box
+                      sx={{
+                        position: "relative",
+                        width: 44,
+                        height: 44,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="44"
+                        height="44"
+                        style={{ transform: "rotate(-90deg)" }}
+                      >
                         <circle
                           cx="22"
                           cy="22"
                           r="18"
                           fill="none"
-                          stroke={timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "#10b981"}
+                          stroke="#e2e8f0"
+                          strokeWidth="3.5"
+                        />
+                        <circle
+                          cx="22"
+                          cy="22"
+                          r="18"
+                          fill="none"
+                          stroke={
+                            timeLeft <= 10
+                              ? "#ef4444"
+                              : timeLeft <= 30
+                                ? "#f59e0b"
+                                : "#10b981"
+                          }
                           strokeWidth="3.5"
                           strokeLinecap="round"
                           strokeDasharray={`${2 * Math.PI * 18}`}
                           strokeDashoffset={`${2 * Math.PI * 18 * (1 - timeLeft / ANSWER_TIME_LIMIT)}`}
-                          style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
+                          style={{
+                            transition:
+                              "stroke-dashoffset 1s linear, stroke 0.5s ease",
+                          }}
                         />
                       </svg>
                       <Typography
@@ -924,8 +1266,14 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           transform: "translate(-50%, -50%)",
                           fontSize: "0.7rem",
                           fontWeight: 800,
-                          color: timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "#10b981",
-                          animation: timeLeft <= 10 ? "pulse 1s infinite" : "none",
+                          color:
+                            timeLeft <= 10
+                              ? "#ef4444"
+                              : timeLeft <= 30
+                                ? "#f59e0b"
+                                : "#10b981",
+                          animation:
+                            timeLeft <= 10 ? "pulse 1s infinite" : "none",
                           "@keyframes pulse": {
                             "0%, 100%": { opacity: 1 },
                             "50%": { opacity: 0.5 },
@@ -936,25 +1284,56 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                       </Typography>
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "text.secondary" }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 600,
+                          color:
+                            timeLeft <= 10
+                              ? "#ef4444"
+                              : timeLeft <= 30
+                                ? "#f59e0b"
+                                : "text.secondary",
+                        }}
+                      >
                         {timeLeft <= 10
                           ? "⚠️ Segera jawab! Waktu hampir habis"
                           : timeLeft <= 30
-                          ? "🕐 Sisa waktu sedikit"
-                          : "⏱ Waktu menjawab"}
+                            ? "🕐 Sisa waktu sedikit"
+                            : "⏱ Waktu menjawab"}
                       </Typography>
-                      <Box sx={{ mt: 0.5, height: 4, bgcolor: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
-                        <Box sx={{
-                          height: "100%",
-                          width: `${(timeLeft / ANSWER_TIME_LIMIT) * 100}%`,
-                          bgcolor: timeLeft <= 10 ? "#ef4444" : timeLeft <= 30 ? "#f59e0b" : "#10b981",
+                      <Box
+                        sx={{
+                          mt: 0.5,
+                          height: 4,
+                          bgcolor: "#e2e8f0",
                           borderRadius: 2,
-                          transition: "width 1s linear, background-color 0.5s ease",
-                        }} />
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            height: "100%",
+                            width: `${(timeLeft / ANSWER_TIME_LIMIT) * 100}%`,
+                            bgcolor:
+                              timeLeft <= 10
+                                ? "#ef4444"
+                                : timeLeft <= 30
+                                  ? "#f59e0b"
+                                  : "#10b981",
+                            borderRadius: 2,
+                            transition:
+                              "width 1s linear, background-color 0.5s ease",
+                          }}
+                        />
                       </Box>
                     </Box>
-                    <Typography variant="caption" sx={{ color: "text.disabled", flexShrink: 0 }}>
-                      {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.disabled", flexShrink: 0 }}
+                    >
+                      {Math.floor(timeLeft / 60)}:
+                      {String(timeLeft % 60).padStart(2, "0")}
                     </Typography>
                   </Box>
                 )}
@@ -978,7 +1357,9 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                   }}
                   error={formik.touched.answer && Boolean(formik.errors.answer)}
                   helperText={formik.touched.answer && formik.errors.answer}
-                  disabled={formik.isSubmitting || isLoading || isSubmittingAnswer}
+                  disabled={
+                    formik.isSubmitting || isLoading || isSubmittingAnswer
+                  }
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 2,
@@ -995,12 +1376,21 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                     },
                   }}
                 />
-                <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  sx={{ justifyContent: "flex-end" }}
+                >
                   <Button
                     type="submit"
                     variant="contained"
                     color="primary"
-                    disabled={formik.isSubmitting || isLoading || isSubmittingAnswer || !formik.values.answer.trim()}
+                    disabled={
+                      formik.isSubmitting ||
+                      isLoading ||
+                      isSubmittingAnswer ||
+                      !formik.values.answer.trim()
+                    }
                     sx={{
                       px: 4,
                       py: 1.2,
@@ -1025,7 +1415,6 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
               </Stack>
             </Box>
           )}
-
         </Card>
       </Container>
 
@@ -1045,11 +1434,16 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         </DialogTitle>
         <DialogContent sx={{ py: 2 }}>
           <Typography>
-            Anda tidak dapat keluar dari mode fullscreen sampai sesi wawancara selesai. Harap selesaikan semua pertanyaan terlebih dahulu.
+            Anda tidak dapat keluar dari mode fullscreen sampai sesi wawancara
+            selesai. Harap selesaikan semua pertanyaan terlebih dahulu.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2, pt: 0 }}>
-          <Button onClick={() => setShowExitWarning(false)} variant="contained" color="primary">
+          <Button
+            onClick={() => setShowExitWarning(false)}
+            variant="contained"
+            color="primary"
+          >
             Saya Mengerti
           </Button>
         </DialogActions>
