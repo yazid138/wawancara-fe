@@ -230,7 +230,35 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (data) {
-      setInterviewData(data);
+      let updatedData = { ...data };
+      if (data.currentQ) {
+        const chatHistories = (data.history.chatHistories || []) as ChatHistory[];
+        const hasCurrentQ = chatHistories.some((ch) => {
+          if (ch.role !== "AI") return false;
+          if (data.currentQ!.id === -1) {
+            return ch.questionId === null && ch.content === data.currentQ!.content;
+          }
+          return ch.questionId === data.currentQ!.id;
+        });
+
+        if (!hasCurrentQ) {
+          updatedData = {
+            ...data,
+            history: {
+              ...data.history,
+              chatHistories: upsertChatHistory(chatHistories, {
+                id: `ai-chat-${data.currentQ.id}-${Date.now()}`,
+                role: "AI",
+                content: data.currentQ.content,
+                questionId: data.currentQ.id === -1 ? null : data.currentQ.id,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }),
+            },
+          };
+        }
+      }
+      setInterviewData(updatedData);
     }
   }, [data]);
 
@@ -470,12 +498,20 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
             });
 
             if (submission.nextQuestion) {
+              const updatedChatHistories = upsertChatHistory(nextChatHistories, {
+                id: `ai-chat-${submission.nextQuestion.id}-${Date.now()}`,
+                role: "AI",
+                content: submission.nextQuestion.content,
+                questionId: submission.nextQuestion.id === -1 ? null : submission.nextQuestion.id,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              });
               return {
                 ...current,
                 currentQ: submission.nextQuestion,
                 history: {
                   ...current.history,
-                  chatHistories: nextChatHistories,
+                  chatHistories: updatedChatHistories,
                 },
               };
             }
