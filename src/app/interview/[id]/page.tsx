@@ -152,7 +152,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [interviewData, setInterviewData] = useState<InterviewViewData | null>(null);
   const [skippedNotification, setSkippedNotification] = useState(false);
-  
+
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
@@ -344,6 +344,11 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         if (!current || !nextQuestion) return current;
 
         const chatHistories = (current.history.chatHistories || []) as ChatHistory[];
+        // Follow-up question mendapat prefix 'follow-up-' pada id
+        // agar badge amber ditampilkan di bubble chat
+        const chatId = nextQuestion.isFollowUp
+          ? `follow-up-${nextQuestion.id}`
+          : `ai-chat-${nextQuestion.id}-${Date.now()}`;
 
         return {
           ...current,
@@ -351,7 +356,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
           history: {
             ...current.history,
             chatHistories: upsertChatHistory(chatHistories, {
-              id: `ai-chat-${nextQuestion.id}-${Date.now()}`,
+              id: chatId,
               role: "AI",
               content: nextQuestion.content,
               questionId: nextQuestion.id === -1 ? null : nextQuestion.id,
@@ -469,6 +474,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
       try {
         setIsSubmittingAnswer(true);
         stopTimer(); // Stop timer saat user submit
+
         if (socket && isSocketConnected) {
           socket.emit("submit-answer", {
             interviewId,
@@ -577,6 +583,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
     text: string;
     id: string | number;
     scoreObj?: { score: number; reason: string; type: string } | null;
+    /** true jika ini adalah follow-up question dari AI */
+    isFollowUp?: boolean;
   };
   const messages: MessageType[] = [];
 
@@ -654,6 +662,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         text: ch.content,
         id: `chat-${ch.id}`,
         scoreObj,
+        // Follow-up question ditandai dengan prefix 'follow-up-' pada id
+        isFollowUp: ch.role === "AI" && String(ch.id).startsWith("follow-up-"),
       });
     });
 
@@ -832,15 +842,31 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           borderRadius: 3,
                           borderTopRightRadius: isUser ? 4 : undefined,
                           borderTopLeftRadius: !isUser ? 4 : undefined,
-                          bgcolor: isUser ? "#10b981" : "#ffffff",
+                          bgcolor: isUser ? "#10b981" : msg.isFollowUp ? "#fffbf2" : "#ffffff",
                           color: isUser ? "white" : "text.primary",
                           boxShadow: isUser
                             ? "0 4px 12px rgba(16, 185, 129, 0.2)"
+                            : msg.isFollowUp
+                            ? "0 2px 8px rgba(245, 158, 11, 0.12)"
                             : "0 2px 8px rgba(0, 0, 0, 0.06)",
-                          border: isUser ? "none" : "1px solid #e2e8f0",
+                          border: isUser
+                            ? "none"
+                            : msg.isFollowUp
+                            ? "1.5px solid rgba(245, 158, 11, 0.35)"
+                            : "1px solid #e2e8f0",
                           wordWrap: "break-word",
                         }}
                       >
+                        {/* Badge follow-up */}
+                        {msg.isFollowUp && (
+                          <Box sx={{ mb: 1 }}>
+                            <Chip
+                              label="🔍 Follow-up Question"
+                              size="small"
+                              sx={{ bgcolor: "#f59e0b", color: "#fff", fontWeight: 700, fontSize: "0.7rem" }}
+                            />
+                          </Box>
+                        )}
                         <Typography sx={{
                           whiteSpace: "pre-wrap",
                           lineHeight: 1.6,
@@ -861,6 +887,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                           </Box>
                         )}
                       </Paper>
+
                       {isUser && (
                         <Avatar sx={{
                           bgcolor: "#059669",
@@ -1022,7 +1049,6 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
               </Typography>
             </Box>
           )}
-
           {/* Input Area */}
           {!isFinished && (
             <Box
@@ -1035,6 +1061,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
               }}
             >
               <Stack spacing={2}>
+
                 {/* Timer */}
                 {isTimerActive && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>

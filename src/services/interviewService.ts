@@ -4,6 +4,9 @@ export type Question = {
   id: number;
   content: string;
   type: string;
+  /** true ketika pertanyaan ini adalah follow-up yang digenerate AI */
+  isFollowUp?: boolean;
+  followUpReason?: string;
 };
 
 export type Answer = {
@@ -28,7 +31,15 @@ export type InterviewHistory = {
   position?: any;
   resume?: string;
   finalResume?: string;
-  chatHistories?: any[]; 
+  chatHistories?: any[];
+};
+
+/** Payload yang diterima dari socket event follow-up-generated */
+export type FollowUpQuestion = {
+  id: number;
+  content: string;
+  reason: string;
+  expectedSignal?: string;
 };
 
 export const interviewService = {
@@ -71,6 +82,20 @@ export const interviewService = {
       { headers: { Authorization: `Bearer ${token}` } },
     );
     return response.data;
+  },
+
+  /** Submit jawaban untuk follow-up question via REST (fallback jika socket tidak tersambung) */
+  submitFollowUpAnswer: async (
+    followUpQuestionId: number,
+    answer: string,
+    token: string,
+  ) => {
+    const response = await api.post<ApiResponse<{ updatedScore: any; breakdown: any }>>(
+      `/follow-up/${followUpQuestionId}/answer`,
+      { answer },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return response.data.data;
   },
 
   updateFinalResume: async (
