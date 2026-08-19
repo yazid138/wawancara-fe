@@ -232,13 +232,20 @@ export default function Home() {
                   >
                     📭 Anda belum mengikuti interview apapun.
                   </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => router.push("/internship-applications")}
-                  >
-                    Mulai Lamar Magang
-                  </Button>
+                  {session?.user?.role === "STUDENT" && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => router.push("/internship-applications")}
+                    >
+                      Mulai Lamar Magang
+                    </Button>
+                  )}
+                  {session?.user?.role === "ADMIN" && (
+                    <Typography color="text.secondary">
+                      Admin/HR tidak dapat melakukan wawancara. Silakan kelola wawancara di menu Admin.
+                    </Typography>
+                  )}
                 </Box>
               )}
             </CardContent>

@@ -15,6 +15,7 @@
     "@mui/icons-material": "9.0.0",
     "@mui/material": "^9.0.0",
     "@mui/material-nextjs": "^9.0.0",
+    "@mui/x-data-grid": "^9.11.0",
     "axios": "^1.16.0",
     "formik": "^2.4.9",
     "next": "16.2.4",

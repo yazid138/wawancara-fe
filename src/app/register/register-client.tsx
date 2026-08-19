@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useFormik } from "formik";
 import * as Yup from "yup";
@@ -19,42 +18,52 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
+import { api, type ApiResponse } from "@/lib/api";
 
-const loginSchema = Yup.object({
-  username: Yup.string().required("Username wajib diisi"),
+const registerSchema = Yup.object({
+  name: Yup.string().required("Nama wajib diisi"),
+  username: Yup.string().min(3, "Minimal 3 karakter").required("Username wajib diisi"),
   password: Yup.string().min(5, "Minimal 5 karakter").required("Password wajib diisi"),
 });
 
-export default function LoginClient() {
-  const searchParams = useSearchParams();
+export default function RegisterClient() {
+  const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const callbackUrl = useMemo(() => searchParams.get("callbackUrl") ?? "/", [searchParams]);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
   const formik = useFormik({
     initialValues: {
+      name: "",
       username: "",
       password: "",
     },
-    validationSchema: loginSchema,
+    validationSchema: registerSchema,
     validateOnBlur: true,
     validateOnChange: false,
     onSubmit: async (values, helpers) => {
       setSubmitError(null);
-      const result = await signIn("credentials", {
-        username: values.username,
-        password: values.password,
-        redirect: false,
-        callbackUrl,
-      });
+      setSubmitSuccess(null);
 
-      if (result?.error) {
-        setSubmitError(result.error);
+      try {
+        await api.post<ApiResponse<any>>("/auth/register", {
+          name: values.name,
+          username: values.username,
+          password: values.password,
+          role: "STUDENT",
+        });
+
+        setSubmitSuccess("Pendaftaran berhasil! Mengarahkan ke halaman login...");
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      } catch (err: any) {
+        const message =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Gagal melakukan pendaftaran";
+        setSubmitError(message);
         helpers.setSubmitting(false);
-        return;
       }
-
-      window.location.href = result?.url ?? callbackUrl;
     },
   });
 
@@ -85,13 +94,17 @@ export default function LoginClient() {
             right: "-50%",
             width: "200%",
             height: "200%",
-            background: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+            background:
+              "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
             backgroundSize: "50px 50px",
             animation: "float 20s infinite linear",
           },
         }}
       >
-        <Stack spacing={4} sx={{ maxWidth: 540, position: "relative", zIndex: 1 }}>
+        <Stack
+          spacing={4}
+          sx={{ maxWidth: 540, position: "relative", zIndex: 1 }}
+        >
           <Box>
             <Typography
               variant="overline"
@@ -113,15 +126,17 @@ export default function LoginClient() {
                 fontSize: { xs: "2rem", sm: "2.5rem" },
               }}
             >
-              Kelola Wawancara Dengan Mudah
+              Simulasi Wawancara Magang
             </Typography>
           </Box>
-          <Typography sx={{ fontSize: "1.05rem", lineHeight: 1.8, opacity: 0.92 }}>
-            Platform interview terpadu untuk mengelola pertanyaan, penilaian, dan hasil interview
-            calon magang dengan sistem yang efisien dan transparan.
+          <Typography
+            sx={{ fontSize: "1.05rem", lineHeight: 1.8, opacity: 0.92 }}
+          >
+            Daftar untuk berlatih wawancara magang dengan AI. Dapatkan
+            evaluasi otomatis dan feedback komprehensif.
           </Typography>
           <Divider flexItem sx={{ borderColor: "rgba(255,255,255,0.25)" }} />
-          <Stack direction="row" spacing={2} sx={{alignItems: 'flex-start'}}>
+          <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
             <Avatar
               sx={{
                 bgcolor: "rgba(255,255,255,0.25)",
@@ -133,9 +148,12 @@ export default function LoginClient() {
               ✓
             </Avatar>
             <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: "1rem" }}>Secure Login</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: "1rem" }}>
+                Gratis & Terbuka
+              </Typography>
               <Typography sx={{ opacity: 0.85, fontSize: "0.95rem", mt: 0.5 }}>
-                Autentikasi aman dengan validasi kredensial backend yang terpercaya.
+                Akses gratis untuk mahasiswa yang ingin berlatih wawancara
+                magang.
               </Typography>
             </Box>
           </Stack>
@@ -162,21 +180,27 @@ export default function LoginClient() {
           }}
         >
           <CardContent sx={{ p: { xs: 3, sm: 5 } }}>
-            <Stack spacing={3.5} component="form" onSubmit={formik.handleSubmit} noValidate>
+            <Stack
+              spacing={3.5}
+              component="form"
+              onSubmit={formik.handleSubmit}
+              noValidate
+            >
               <Stack spacing={1}>
                 <Typography
                   variant="h4"
                   sx={{
                     fontWeight: 800,
-                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    background:
+                      "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   }}
                 >
-                  Masuk
+                  Daftar Akun
                 </Typography>
                 <Typography color="text.secondary" sx={{ fontSize: "0.95rem" }}>
-                  Gunakan kredensial Anda untuk mengakses dashboard.
+                  Buat akun mahasiswa untuk mengakses simulasi wawancara.
                 </Typography>
               </Stack>
 
@@ -193,6 +217,39 @@ export default function LoginClient() {
                 </Alert>
               )}
 
+              {submitSuccess && (
+                <Alert
+                  severity="success"
+                  sx={{
+                    borderRadius: 2,
+                    backgroundColor: "rgba(16, 185, 129, 0.08)",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                  }}
+                >
+                  {submitSuccess}
+                </Alert>
+              )}
+
+              <TextField
+                id="name"
+                name="name"
+                label="Nama Lengkap"
+                placeholder="Masukkan nama lengkap Anda"
+                value={formik.values.name}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.name && Boolean(formik.errors.name)}
+                helperText={formik.touched.name ? formik.errors.name : " "}
+                autoComplete="name"
+                fullWidth
+                size="medium"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 2,
+                  },
+                }}
+              />
+
               <TextField
                 id="username"
                 name="username"
@@ -201,8 +258,12 @@ export default function LoginClient() {
                 value={formik.values.username}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.username && Boolean(formik.errors.username)}
-                helperText={formik.touched.username ? formik.errors.username : " "}
+                error={
+                  formik.touched.username && Boolean(formik.errors.username)
+                }
+                helperText={
+                  formik.touched.username ? formik.errors.username : " "
+                }
                 autoComplete="username"
                 fullWidth
                 size="medium"
@@ -222,9 +283,13 @@ export default function LoginClient() {
                 value={formik.values.password}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.password && Boolean(formik.errors.password)}
-                helperText={formik.touched.password ? formik.errors.password : " "}
-                autoComplete="current-password"
+                error={
+                  formik.touched.password && Boolean(formik.errors.password)
+                }
+                helperText={
+                  formik.touched.password ? formik.errors.password : " "
+                }
+                autoComplete="new-password"
                 fullWidth
                 size="medium"
                 sx={{
@@ -259,7 +324,7 @@ export default function LoginClient() {
                     Memproses...
                   </>
                 ) : (
-                  "Masuk ke Dashboard"
+                  "Daftar Sekarang"
                 )}
               </Button>
 
@@ -270,16 +335,16 @@ export default function LoginClient() {
                   color: "text.secondary",
                 }}
               >
-                Belum punya akun?{" "}
+                Sudah punya akun?{" "}
                 <Link
-                  href="/register"
+                  href="/login"
                   style={{
                     color: "#10b981",
                     fontWeight: 700,
                     textDecoration: "none",
                   }}
                 >
-                  Daftar di sini
+                  Masuk di sini
                 </Link>
               </Typography>
             </Stack>

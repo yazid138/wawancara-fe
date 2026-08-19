@@ -146,6 +146,7 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
+  const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "COMPANY";
   const ANSWER_TIME_LIMIT = 90; // 90 detik = 1.5 menit
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -644,8 +645,8 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         const categoryName = matchingAns.question
           ? ((matchingAns.question as any).category?.name || matchingAns.question.type)
           : "";
-          
-        if (matchingAns.score) {
+           
+        if (matchingAns.score && isAdmin) {
           const s = matchingAns.score;
           const feedbackText = s.reason || s.feedback || "";
           scoreObj = { score: s.finalScore, reason: s.feedback, type: s.type === "SOFTSKILL" ? "softskill" : "technical" };
@@ -662,7 +663,6 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
         text: ch.content,
         id: `chat-${ch.id}`,
         scoreObj,
-        // Follow-up question ditandai dengan prefix 'follow-up-' pada id
         isFollowUp: ch.role === "AI" && String(ch.id).startsWith("follow-up-"),
       });
     });
@@ -906,109 +906,132 @@ export default function InterviewChatPage({ params }: { params: Promise<{ id: st
                 })}
                 {isFinished && (
                   <Box sx={{ pt: 3, pb: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <Card
-                      elevation={0}
-                      sx={{
-                        width: "100%",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 3,
-                        mb: 3,
-                        overflow: "hidden"
-                      }}
-                    >
-                      <Box sx={{ p: 2.5, bgcolor: "rgba(16, 185, 129, 0.08)", borderBottom: "1px solid rgba(16, 185, 129, 0.2)", display: "flex", justifyContent: "space-between", alignItems: "center", flexDirection: { xs: "column", sm: "row" }, gap: 2 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#059669" }}>
-                          📊 Hasil Penilaian Wawancara
-                        </Typography>
-                        <Chip label={`Skor Keseluruhan: ${overallScore}/100`} color="primary" sx={{ fontWeight: 800, fontSize: "1.05rem", py: 2.5, px: 1 }} />
-                      </Box>
-                      <Box sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-                          📝 Ringkasan Evaluasi
-                        </Typography>
-                        <Stack spacing={2}>
-                          {summaryPoints.length > 0 ? summaryPoints.map((point, idx) => (
-                            <Box key={idx} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
-                              <Typography color="primary" sx={{ fontWeight: 800, mt: "-2px" }}>•</Typography>
-                              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>{point}</Typography>
-                            </Box>
-                          )) : (
-                            <Typography variant="body2" color="text.secondary">Belum ada ringkasan yang tersedia.</Typography>
-                          )}
-                        </Stack>
-                      </Box>
-                      {activeData?.history?.resume && (
+                    {isAdmin ? (
+                      <Card
+                        elevation={0}
+                        sx={{
+                          width: "100%",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 3,
+                          mb: 3,
+                          overflow: "hidden"
+                        }}
+                      >
+                        <Box sx={{ p: 2.5, bgcolor: "rgba(16, 185, 129, 0.08)", borderBottom: "1px solid rgba(16, 185, 129, 0.2)", display: "flex", justifyContent: "space-between", alignItems: "center", flexDirection: { xs: "column", sm: "row" }, gap: 2 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 800, color: "#059669" }}>
+                            📊 Hasil Penilaian Wawancara
+                          </Typography>
+                          <Chip label={`Skor Keseluruhan: ${overallScore}/100`} color="primary" sx={{ fontWeight: 800, fontSize: "1.05rem", py: 2.5, px: 1 }} />
+                        </Box>
+                        <Box sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                            📝 Ringkasan Evaluasi
+                          </Typography>
+                          <Stack spacing={2}>
+                            {summaryPoints.length > 0 ? summaryPoints.map((point, idx) => (
+                              <Box key={idx} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+                                <Typography color="primary" sx={{ fontWeight: 800, mt: "-2px" }}>•</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>{point}</Typography>
+                              </Box>
+                            )) : (
+                              <Typography variant="body2" color="text.secondary">Belum ada ringkasan yang tersedia.</Typography>
+                            )}
+                          </Stack>
+                        </Box>
+                        {activeData?.history?.resume && (
+                          <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
+                              📝 Resume Wawancara (AI)
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                              {activeData.history.resume}
+                            </Typography>
+                          </Box>
+                        )}
+
                         <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-                            📝 Resume Wawancara (AI)
+                            ✍️ Resume Final (Hasil Akhir)
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                            {activeData.history.resume}
-                          </Typography>
-                        </Box>
-                      )}
-
-                      <Box sx={{ p: { xs: 2.5, sm: 3.5 }, borderTop: "1px solid #e2e8f0" }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-                          ✍️ Resume Final (Hasil Akhir)
-                        </Typography>
-                        <TextField
-                          fullWidth
-                          multiline
-                          minRows={4}
-                          maxRows={10}
-                          placeholder="Masukkan resume final hasil wawancara di sini..."
-                          value={finalResumeInput}
-                          onChange={(e) => setFinalResumeInput(e.target.value)}
-                          disabled={isSavingFinalResume}
-                          sx={{
-                            mb: 2,
-                            "& .MuiOutlinedInput-root": {
+                          <TextField
+                            fullWidth
+                            multiline
+                            minRows={4}
+                            maxRows={10}
+                            placeholder="Masukkan resume final hasil wawancara di sini..."
+                            value={finalResumeInput}
+                            onChange={(e) => setFinalResumeInput(e.target.value)}
+                            disabled={isSavingFinalResume}
+                            sx={{
+                              mb: 2,
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: 2,
+                                border: "1px solid #e2e8f0",
+                                backgroundColor: "#fafbfc",
+                                transition: "all 0.2s",
+                                "&:hover": {
+                                  borderColor: "#10b981",
+                                },
+                                "&.Mui-focused": {
+                                  borderColor: "#10b981",
+                                  backgroundColor: "#ffffff",
+                                },
+                              },
+                            }}
+                          />
+                          {saveFinalResumeSuccess && (
+                            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                              Resume final berhasil disimpan!
+                            </Alert>
+                          )}
+                          {saveFinalResumeError && (
+                            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                              {saveFinalResumeError}
+                            </Alert>
+                          )}
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleSaveFinalResume}
+                            disabled={isSavingFinalResume || !finalResumeInput.trim()}
+                            sx={{
+                              fontWeight: 700,
                               borderRadius: 2,
-                              border: "1px solid #e2e8f0",
-                              backgroundColor: "#fafbfc",
-                              transition: "all 0.2s",
-                              "&:hover": {
-                                borderColor: "#10b981",
-                              },
-                              "&.Mui-focused": {
-                                borderColor: "#10b981",
-                                backgroundColor: "#ffffff",
-                              },
-                            },
-                          }}
-                        />
-                        {saveFinalResumeSuccess && (
-                          <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
-                            Resume final berhasil disimpan!
-                          </Alert>
-                        )}
-                        {saveFinalResumeError && (
-                          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                            {saveFinalResumeError}
-                          </Alert>
-                        )}
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          onClick={handleSaveFinalResume}
-                          disabled={isSavingFinalResume || !finalResumeInput.trim()}
+                              px: 3,
+                              py: 1,
+                              boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                            }}
+                          >
+                            {isSavingFinalResume ? (
+                              <CircularProgress size={20} color="inherit" />
+                            ) : (
+                              "Simpan Resume Final"
+                            )}
+                          </Button>
+                        </Box>
+                      </Card>
+                    ) : (
+                      activeData?.history?.finalResume && (
+                        <Card
+                          elevation={0}
                           sx={{
-                            fontWeight: 700,
-                            borderRadius: 2,
-                            px: 3,
-                            py: 1,
-                            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                            width: "100%",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: 3,
+                            mb: 3,
+                            overflow: "hidden",
+                            p: { xs: 2.5, sm: 3.5 }
                           }}
                         >
-                          {isSavingFinalResume ? (
-                            <CircularProgress size={20} color="inherit" />
-                          ) : (
-                            "Simpan Resume Final"
-                          )}
-                        </Button>
-                      </Box>
-                    </Card>
+                          <Typography variant="h6" sx={{ fontWeight: 800, color: "#059669", mb: 2 }}>
+                            ✍️ Hasil Wawancara
+                          </Typography>
+                          <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                            {activeData.history.finalResume}
+                          </Typography>
+                        </Card>
+                      )
+                    )}
                     <Chip
                       label="✓ Sesi wawancara telah selesai"
                       color="success"

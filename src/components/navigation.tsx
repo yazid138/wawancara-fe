@@ -155,15 +155,50 @@ export default function Navigation() {
               >
                 Dashboard
               </Button>
-              <Button
-                component={Link}
-                href="/internship-applications"
-                variant="text"
-                color="inherit"
-                sx={getNavLinkStyle("/internship-applications")}
-              >
-                Lamar
-              </Button>
+              {session?.user?.role === "STUDENT" && (
+                <Button
+                  component={Link}
+                  href="/internship-applications"
+                  variant="text"
+                  color="inherit"
+                  sx={getNavLinkStyle("/internship-applications")}
+                >
+                  Lamar
+                </Button>
+              )}
+              {session?.user?.role === "COMPANY" && (
+                <Button
+                  component={Link}
+                  href="/company"
+                  variant="text"
+                  color="inherit"
+                  sx={getNavLinkStyle("/company")}
+                >
+                  Lamaran
+                </Button>
+              )}
+              {session?.user?.role === "ADMIN" && (
+                <>
+                  <Button
+                    component={Link}
+                    href="/admin"
+                    variant="text"
+                    color="inherit"
+                    sx={getNavLinkStyle("/admin")}
+                  >
+                    Mahasiswa
+                  </Button>
+                  <Button
+                    component={Link}
+                    href="/company"
+                    variant="text"
+                    color="inherit"
+                    sx={getNavLinkStyle("/company")}
+                  >
+                    HR
+                  </Button>
+                </>
+              )}
             </Stack>
           )}
 
@@ -262,16 +297,54 @@ export default function Navigation() {
                           {isActive("/") ? "✓ " : ""}📊 Dashboard
                         </Typography>
                       </MenuItem>
-                      <MenuItem
-                        component={Link}
-                        href="/internship-applications"
-                        onClick={handleClose}
-                        sx={getMenuItemStyle("/internship-applications")}
-                      >
-                        <Typography sx={{ fontWeight: isActive("/internship-applications") ? 700 : 600 }}>
-                          {isActive("/internship-applications") ? "✓ " : ""}💼 Lamar Magang
-                        </Typography>
-                      </MenuItem>
+                      {session?.user?.role === "STUDENT" && (
+                        <MenuItem
+                          component={Link}
+                          href="/internship-applications"
+                          onClick={handleClose}
+                          sx={getMenuItemStyle("/internship-applications")}
+                        >
+                          <Typography sx={{ fontWeight: isActive("/internship-applications") ? 700 : 600 }}>
+                            {isActive("/internship-applications") ? "✓ " : ""}💼 Lamar Magang
+                          </Typography>
+                        </MenuItem>
+                      )}
+                      {session?.user?.role === "COMPANY" && (
+                        <MenuItem
+                          component={Link}
+                          href="/company"
+                          onClick={handleClose}
+                          sx={getMenuItemStyle("/company")}
+                        >
+                          <Typography sx={{ fontWeight: isActive("/company") ? 700 : 600 }}>
+                            {isActive("/company") ? "✓ " : ""}📋 Lamaran
+                          </Typography>
+                        </MenuItem>
+                      )}
+                      {session?.user?.role === "ADMIN" && (
+                        <>
+                          <MenuItem
+                            component={Link}
+                            href="/admin"
+                            onClick={handleClose}
+                            sx={getMenuItemStyle("/admin")}
+                          >
+                            <Typography sx={{ fontWeight: isActive("/admin") ? 700 : 600 }}>
+                              {isActive("/admin") ? "✓ " : ""}🎓 Mahasiswa
+                            </Typography>
+                          </MenuItem>
+                          <MenuItem
+                            component={Link}
+                            href="/company"
+                            onClick={handleClose}
+                            sx={getMenuItemStyle("/company")}
+                          >
+                            <Typography sx={{ fontWeight: isActive("/company") ? 700 : 600 }}>
+                              {isActive("/company") ? "✓ " : ""}🏢 HR
+                            </Typography>
+                          </MenuItem>
+                        </>
+                      )}
 
                       <Divider sx={{ my: 1 }} />
 

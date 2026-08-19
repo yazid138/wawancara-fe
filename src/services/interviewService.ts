@@ -32,6 +32,8 @@ export type InterviewHistory = {
   resume?: string;
   finalResume?: string;
   chatHistories?: any[];
+  focusQuestions?: any[];
+  user?: any;
 };
 
 /** Payload yang diterima dari socket event follow-up-generated */
